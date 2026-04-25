@@ -1,0 +1,189 @@
+--[[
+    YOUTUBE SEARCH ENGINE - EXECUTOR VERSION
+    Tính năng: Kết nối trực tiếp với YouTube qua API Proxy.
+    Không sử dụng Asset ID của Roblox. 
+    Lấy thông tin: Tiêu đề, Kênh, Thời lượng, Video ID.
+]]
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+local HttpService = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+
+-- Xóa giao diện cũ nếu đã tồn tại
+if CoreGui:FindFirstChild("YT_SearchHub") then
+    CoreGui.YT_SearchHub:Destroy()
+end
+
+-- TẠO GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "YT_SearchHub"
+ScreenGui.Parent = CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local Main = Instance.new("Frame")
+Main.Name = "Main"
+Main.Size = UDim2.new(0, 400, 0, 500)
+Main.Position = UDim2.new(0.5, -200, 0.5, -250)
+Main.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+Main.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.Parent = Main
+
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 50)
+TopBar.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = Main
+
+local TopCorner = Instance.new("UICorner")
+TopCorner.CornerRadius = UDim.new(0, 12)
+TopCorner.Parent = TopBar
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 1, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "YOUTUBE DATA ENGINE"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+Title.Parent = TopBar
+
+local SearchContainer = Instance.new("Frame")
+SearchContainer.Size = UDim2.new(0.9, 0, 0, 40)
+SearchContainer.Position = UDim2.new(0.05, 0, 0.13, 0)
+SearchContainer.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+SearchContainer.Parent = Main
+
+local SearchCorner = Instance.new("UICorner")
+SearchCorner.Parent = SearchContainer
+
+local SearchBox = Instance.new("TextBox")
+SearchBox.Size = UDim2.new(1, -10, 1, 0)
+SearchBox.Position = UDim2.new(0, 5, 0, 0)
+SearchBox.BackgroundTransparency = 1
+SearchBox.PlaceholderText = "Tìm kiếm bài hát trên YouTube..."
+SearchBox.Text = ""
+SearchBox.TextColor3 = Color3.new(1, 1, 1)
+SearchBox.TextXAlignment = Enum.TextXAlignment.Left
+SearchBox.Font = Enum.Font.Gotham
+SearchBox.Parent = SearchContainer
+
+local Scroll = Instance.new("ScrollingFrame")
+Scroll.Size = UDim2.new(0.9, 0, 0.75, 0)
+Scroll.Position = UDim2.new(0.05, 0, 0.23, 0)
+Scroll.BackgroundTransparency = 1
+Scroll.ScrollBarThickness = 3
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+Scroll.Parent = Main
+
+local ListLayout = Instance.new("UIListLayout")
+ListLayout.Padding = UDim.new(0, 8)
+ListLayout.Parent = Scroll
+
+-- HÀM THÔNG BÁO CUSTOM
+local function Notify(txt)
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "YouTube Engine",
+        Text = txt,
+        Duration = 3
+    })
+end
+
+-- HÀM TÌM KIẾM CHÍNH (Kết nối YouTube API Proxy)
+local function SearchYouTube(query)
+    -- Dọn dẹp kết quả cũ
+    for _, item in pairs(Scroll:GetChildren()) do
+        if item:IsA("Frame") then item:Destroy() end
+    end
+
+    Notify("Đang kết nối YouTube...")
+
+    -- API Proxy mã nguồn mở (Piped API) - Rất ổn định cho Executor
+    local apiUrl = "https://pipedapi.kavin.rocks/search?q=" .. HttpService:UrlEncode(query) .. "&filter=videos"
+
+    local success, response = pcall(function()
+        return game:HttpGet(apiUrl)
+    end)
+
+    if not success then
+        Notify("Lỗi kết nối API!")
+        return
+    end
+
+    local data = HttpService:JSONDecode(response)
+    local results = data.content or {}
+
+    if #results == 0 then
+        Notify("Không tìm thấy kết quả.")
+        return
+    end
+
+    for i, video in ipairs(results) do
+        if i > 15 then break end -- Lấy tối đa 15 kết quả
+
+        local ItemFrame = Instance.new("Frame")
+        ItemFrame.Size = UDim2.new(1, -5, 0, 60)
+        ItemFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+        ItemFrame.Parent = Scroll
+
+        local ICorn = Instance.new("UICorner")
+        ICorn.CornerRadius = UDim.new(0, 6)
+        ICorn.Parent = ItemFrame
+
+        local VideoTitle = Instance.new("TextLabel")
+        VideoTitle.Size = UDim2.new(1, -10, 0, 25)
+        VideoTitle.Position = UDim2.new(0, 10, 0, 5)
+        VideoTitle.BackgroundTransparency = 1
+        VideoTitle.Text = video.title
+        VideoTitle.TextColor3 = Color3.new(1, 1, 1)
+        VideoTitle.TextSize = 14
+        VideoTitle.Font = Enum.Font.GothamBold
+        VideoTitle.TextXAlignment = Enum.TextXAlignment.Left
+        VideoTitle.TextTruncate = Enum.TextTruncate.AtEnd
+        VideoTitle.Parent = ItemFrame
+
+        local Info = Instance.new("TextLabel")
+        Info.Size = UDim2.new(1, -10, 0, 20)
+        Info.Position = UDim2.new(0, 10, 0, 30)
+        Info.BackgroundTransparency = 1
+        Info.Text = "Kênh: " .. (video.uploaderName or "Unknown") .. " | Thời lượng: " .. (video.duration or "??")
+        Info.TextColor3 = Color3.fromRGB(180, 180, 180)
+        Info.TextSize = 12
+        Info.Font = Enum.Font.Gotham
+        Info.TextXAlignment = Enum.TextXAlignment.Left
+        Info.Parent = ItemFrame
+
+        local SelectBtn = Instance.new("TextButton")
+        SelectBtn.Size = UDim2.new(1, 0, 1, 0)
+        SelectBtn.BackgroundTransparency = 1
+        SelectBtn.Text = ""
+        SelectBtn.Parent = ItemFrame
+
+        SelectBtn.MouseButton1Click:Connect(function()
+            print("--- YOUTUBE DATA ---")
+            print("Title: " .. video.title)
+            print("ID: " .. video.videoId)
+            print("URL: https://www.youtube.com/watch?v=" .. video.videoId)
+            
+            Notify("Đã lấy dữ liệu: " .. video.title)
+            -- Ở đây bạn có thể thêm logic gửi dữ liệu này đi đâu tùy ý
+        end)
+    end
+    
+    Scroll.CanvasSize = UDim2.new(0, 0, 0, ListLayout.AbsoluteContentSize.Y + 10)
+    Notify("Đã tìm thấy " .. #results .. " kết quả.")
+end
+
+-- Sự kiện khi gõ xong
+SearchBox.FocusLost:Connect(function(enter)
+    if enter and SearchBox.Text ~= "" then
+        SearchYouTube(SearchBox.Text)
+    end
+end)
