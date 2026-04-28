@@ -92,6 +92,7 @@ local function Deserialize(s, default)
     return t
 end
 
+
 -- ═══════════════ AUTO-SAVE SYSTEM ═══════════════
 -- Only PVP dummy keys stored (no gameplay cheats)
 local DEFAULT = {}
@@ -213,9 +214,7 @@ function Library:CreateWindow()
     main.BackgroundColor3 = MainColor; main.BackgroundTransparency = 0.3
     main.Parent = screenGui; main.ClipsDescendants = false
     Instance.new("UICorner", main).CornerRadius = UDim.new(0,15)
-    local mainStroke = Instance.new("UIStroke", main); mainStroke.Thickness = 1
-
-
+    local mainStroke = Instance.new("UIStroke", main); mainStroke.Thickness = 2
 
     local toolbar = Instance.new("Frame", main)
     toolbar.Size = UDim2.new(0,30,0,95); toolbar.Position = UDim2.new(1,5,0,10)
@@ -276,72 +275,6 @@ function Library:CreateWindow()
             mainStroke.Color=c; openStroke.Color=c
         end
     end)()
-
-    -- ── RUNNING DOT along main border ────────────────────────────────────────
-    -- Một chấm tròn sáng chạy vòng quanh viền main frame
-    local dot = Instance.new("Frame", screenGui)
-    dot.Name = "BorderDot"
-    dot.Size = UDim2.new(0, 8, 0, 8)
-    dot.AnchorPoint = Vector2.new(0.5, 0.5)
-    dot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    dot.BackgroundTransparency = 0
-    dot.ZIndex = 10
-    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
-    -- Glow stroke trên dot
-    local dotStroke = Instance.new("UIStroke", dot)
-    dotStroke.Thickness = 3
-    dotStroke.Color = Color3.fromRGB(255, 182, 193)
-    dotStroke.Transparency = 0.3
-
-    coroutine.wrap(function()
-        while task.wait() do
-            if not main.Visible then dot.Visible = false; task.wait(0.1); continue end
-            dot.Visible = true
-
-            local ap = main.AbsolutePosition  -- top-left pixel
-            local as = main.AbsoluteSize
-            local r  = 15  -- corner radius px (match UICorner)
-            local W  = as.X
-            local H  = as.Y
-
-            -- Perimeter = top + right + bottom + left (approx, no corner arcs)
-            local perim = 2*(W + H)
-            local t     = (tick() * 80) % perim  -- speed: 80 px/sec
-
-            local x, y
-
-            -- Top edge: left→right
-            if t < W then
-                x = ap.X + t
-                y = ap.Y
-
-            -- Right edge: top→bottom
-            elseif t < W + H then
-                x = ap.X + W
-                y = ap.Y + (t - W)
-
-            -- Bottom edge: right→left
-            elseif t < 2*W + H then
-                x = ap.X + W - (t - W - H)
-                y = ap.Y + H
-
-            -- Left edge: bottom→top
-            else
-                x = ap.X
-                y = ap.Y + H - (t - 2*W - H)
-            end
-
-            dot.Position = UDim2.new(0, x, 0, y)
-
-            -- Dot color matches animated stroke
-            local tc = (math.sin(tick()*2)+1)/2
-            local cc = Color3.fromRGB(255,255,255):Lerp(Color3.fromRGB(255,192,203),tc)
-                            :Lerp(Color3.fromRGB(230,190,255),(math.cos(tick()*1.5)+1)/2)
-            dot.BackgroundColor3 = cc
-            dotStroke.Color = cc
-        end
-    end)()
-    -- ── END RUNNING DOT ───────────────────────────────────────────────────────
 
     openBtn.MouseButton1Click:Connect(function() PlayClickSound(); ToggleUI() end)
     UserInputService.InputBegan:Connect(function(inp,gpe)
@@ -409,30 +342,13 @@ function Library:CreateWindow()
 
     EnableDrag(main); EnableDrag(openBtn)
 
-    -- Sidebar nằm ngoài main frame, bám theo main position
-    local sidebar = Instance.new("Frame", screenGui)
-    sidebar.Name = "TokaiSidebar"
-    sidebar.Size = UDim2.new(0,35,0,200)
-    sidebar.AnchorPoint = Vector2.new(0, 0.5)
-    sidebar.BackgroundColor3 = Color3.fromRGB(255,255,255)
-    sidebar.BackgroundTransparency = 0.65
-    sidebar.ClipsDescendants = false
-    Instance.new("UICorner", sidebar).CornerRadius = UDim.new(1,0)
+    local sidebar = Instance.new("Frame", main)
+    sidebar.Size=UDim2.new(0,35,0,200); sidebar.Position=UDim2.new(1,-40,0.5,-100)
+    sidebar.BackgroundColor3=Color3.fromRGB(255,255,255); sidebar.BackgroundTransparency=0.65
+    Instance.new("UICorner", sidebar).CornerRadius=UDim.new(1,0)
     local sbl = Instance.new("UIListLayout", sidebar)
-    sbl.Padding = UDim.new(0,7)
-    sbl.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    sbl.VerticalAlignment   = Enum.VerticalAlignment.Center
-
-    -- Keep sidebar glued to right side of main every frame
-    RunService.RenderStepped:Connect(function()
-        local absPos  = main.AbsolutePosition
-        local absSize = main.AbsoluteSize
-        sidebar.Position = UDim2.new(
-            0, absPos.X + absSize.X - 2,
-            0, absPos.Y + absSize.Y/2 - 100
-        )
-        sidebar.Visible = main.Visible
-    end)
+    sbl.Padding=UDim.new(0,7); sbl.HorizontalAlignment=Enum.HorizontalAlignment.Center
+    sbl.VerticalAlignment=Enum.VerticalAlignment.Center
 
     local tabContainer = Instance.new("Frame", main)
     tabContainer.Size=UDim2.new(0,335,0,215); tabContainer.Position=UDim2.new(0,8,0,10)
@@ -975,7 +891,6 @@ function Library:CreateWindow()
 
     return Library
 end
-
 -- ═══════════════════════════════════════════
 --   PVP MODULE — Silent Aim + Wall Check + ESP
 --   Tích hợp từ PVP Mobile Hub V4
@@ -1199,3 +1114,17 @@ pvpTab:AddToggle("⭕ Show FOV",     "_pvpFOV", function(v) PVP.Options.ShowFov 
 pvpTab:AddSlider("FOV Radius", 10, 500, "_pvpFR", " px", function(v)
     PVP.Options.FovRadius = v
 end)
+
+-- ══════════════════════════════════════════
+--   USELESS TAB — chỉ để vui :)
+-- ══════════════════════════════════════════
+local uselessTab = win:CreateTab("Useless", "🤪")
+
+uselessTab:AddSection("Random Scripts")
+uselessTab:AddButton("👤 wklbox", function()
+    loadstring(game:HttpGet(""))()
+end, "Đang chạy script: wklbox", "👤")
+
+uselessTab:AddButton("👤 dolboeb228_negr", function()
+    loadstring(game:HttpGet(""))()
+end, "Đang chạy script: dolboeb228_negr", "👤")
