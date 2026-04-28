@@ -1,0 +1,68 @@
+--[[
+    SCRIPT: GITHUB MP3 PLAYER (EXECUTOR ONLY)
+    Cách hoạt động: 
+    1. Chuyển link GitHub thường sang Link Raw.
+    2. Tải file MP3 về thư mục của Executor.
+    3. Sử dụng getcustomasset để phát nhạc trong Roblox.
+]]
+
+local HttpService = game:GetService("HttpService")
+local ContentProvider = game:GetService("ContentProvider")
+
+-- 1. Link GitHub của bạn
+local githubUrl = "https://github.com/longhazem/TOKAIHUB/blob/main/YTDown_YouTube_Media_o6wtDPVkKqI_009_128k.mp3"
+
+-- 2. Hàm chuyển đổi sang Link Raw
+local function getRawUrl(url)
+    local raw = url:gsub("github.com", "raw.githubusercontent.com")
+    raw = raw:gsub("/blob/", "/")
+    return raw
+end
+
+local rawMp3Url = getRawUrl(githubUrl)
+local fileName = "temp_music_tokai.mp3"
+
+-- 3. Hàm phát nhạc
+local function playMusic()
+    -- Kiểm tra nếu Executor hỗ trợ các hàm cần thiết
+    if not (writefile and getcustomasset) then
+        warn("Executor của bạn không hỗ trợ writefile hoặc getcustomasset!")
+        return
+    end
+
+    print("Đang tải nhạc từ GitHub...")
+    
+    local success, data = pcall(function()
+        return game:HttpGet(rawMp3Url)
+    end)
+
+    if success and data then
+        -- Lưu file vào thư mục workspace của Executor
+        writefile(fileName, data)
+        
+        -- Biến file local thành Asset ID của Roblox
+        local assetId = getcustomasset(fileName)
+        
+        -- Tạo Sound và phát
+        local sound = Instance.new("Sound")
+        sound.Name = "GitHubAudio"
+        sound.SoundId = assetId
+        sound.Volume = 2
+        sound.Parent = game.Players.LocalPlayer.Character or workspace
+        
+        sound:Play()
+        print("Đang phát nhạc thành công!")
+        
+        -- Thông báo trong game
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "Tokai Hub",
+            Text = "Đang phát nhạc từ GitHub...",
+            Duration = 5
+        })
+    else
+        warn("Không thể tải file từ GitHub. Kiểm tra lại link!")
+    end
+end
+
+-- Chạy hàm
+playMusic()
