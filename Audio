@@ -10,7 +10,7 @@ local HttpService = game:GetService("HttpService")
 local ContentProvider = game:GetService("ContentProvider")
 
 -- 1. Link GitHub của bạn
-local githubUrl = "https://github.com/longhazem/TOKAIHUB/blob/main/YTDown_YouTube_Media_o6wtDPVkKqI_009_128k.mp3"
+local githubUrl = "https://github.com/longhazem/TOKAIHUB/blob/main/YTDown_YouTube_KOMM-SUSSER-TOD-M-10-Director-s-Edit-Ver_Media_hoKluzn07eQ_009_128k.mp3"
 
 -- 2. Hàm chuyển đổi sang Link Raw
 local function getRawUrl(url)
@@ -51,7 +51,7 @@ local function playMusic()
         sound.Parent = game.Players.LocalPlayer.Character or workspace
         
         sound:Play()
-        print("Đang phát nhạc thành công!")
+        print("!")
         
         -- Thông báo trong game
         game:GetService("StarterGui"):SetCore("SendNotification", {
