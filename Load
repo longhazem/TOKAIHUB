@@ -1,86 +1,745 @@
-local player = game.Players.LocalPlayer
-local placeId = game.PlaceId
+-- ╔══════════════════════════════════════════════════╗
+-- ║           TokaiHub — Roblox UI Library           ║
+-- ║         Clean Template — Ready to use            ║
+-- ╚══════════════════════════════════════════════════╝
 
--- Danh sách ID bản đồ để tự động kích hoạt
-local PVP_PLACE_IDS = {
-    [5289429734] = true,
-    [5480112241] = true,
-    [4524359706] = true,
-    [5468388011] = true,
-    [3826587512] = true
-}
+local UserInputService = game:GetService("UserInputService")
+local TweenService     = game:GetService("TweenService")
+local SoundService     = game:GetService("SoundService")
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
+local Camera           = workspace.CurrentCamera
 
--- URL mới của bạn
-local BASE_URL = "https://raw.githubusercontent.com/longhazem/TOKAIHUB/refs/heads/main/RBM5PVP/Models/PvP"
+local startTime = os.time()
+_G.ToggleKey    = Enum.KeyCode.RightControl
+local isLocked  = false
+local DISCORD   = "https://discord.gg/nn783R2fK2"
 
-local function loadRemoteScript()
-    task.spawn(function()
-        -- Thêm timestamp để tránh cache
-        local success, result = pcall(function()
-            return game:HttpGet(BASE_URL .. "?v=" .. tostring(os.time()))
-        end)
-        
-        if success then
-            loadstring(result)()
-        else
-            warn("Không thể tải script từ: " .. BASE_URL)
-        end
+-- ═══════════════════════════════════════════════
+--  EXECUTOR COMPATIBILITY LAYER
+-- ═══════════════════════════════════════════════
+local function GetGuiParent()
+    if gethui then
+        local ok, h = pcall(gethui)
+        if ok and h then return h end
+    end
+    local ok, cg = pcall(function() return game:GetService("CoreGui") end)
+    if ok and cg then return cg end
+    return Players.LocalPlayer:WaitForChild("PlayerGui", 5)
+        or Players.LocalPlayer.PlayerGui
+end
+
+local function SafeCopy(text)
+    if setclipboard then pcall(setclipboard, text); return end
+    if toclipboard   then pcall(toclipboard, text);  return end
+    if Clipboard and Clipboard.set then pcall(function() Clipboard.set(text) end); return end
+    if syn and syn.write_clipboard then pcall(syn.write_clipboard, text) end
+end
+
+-- ═══════════════ SAVE SYSTEM ═══════════════
+local SAVE_FILE = "TokaiHubSave.json"
+local function SafeWrite(n, c) pcall(function() if writefile then writefile(n, c) end end) end
+local function SafeRead(n)
+    local ok, d = pcall(function()
+        if not isfile or not readfile then return nil end
+        if not isfile(n) then return nil end
+        return readfile(n)
     end)
+    return (ok and type(d) == "string") and d or nil
+end
+local function Serialize(t)
+    local p = {}
+    for k, v in pairs(t) do
+        table.insert(p, k .. "=" .. (type(v) == "boolean" and (v and "true" or "false") or tostring(v)))
+    end
+    return table.concat(p, ";")
+end
+local function Deserialize(s, def)
+    local t = {}
+    for k, v in pairs(def) do t[k] = v end
+    if not s or s == "" then return t end
+    for pair in s:gmatch("([^;]+)") do
+        local k, v = pair:match("^(.-)=(.+)$")
+        if k and v then
+            if v == "true" then t[k] = true
+            elseif v == "false" then t[k] = false
+            else local n = tonumber(v); if n then t[k] = n end end
+        end
+    end
+    return t
+end
+local DEFAULT = {}
+local S = Deserialize(SafeRead(SAVE_FILE), DEFAULT)
+local function Save() SafeWrite(SAVE_FILE, Serialize(S)) end
+
+-- ═══════════════ CLEANUP ═══════════════
+local function CleanupOldUI()
+    local gui = GetGuiParent()
+    local old = gui:FindFirstChild("TOKAIHUB")
+    if old then old:Destroy() end
+end
+CleanupOldUI()
+
+local function PlayClickSound()
+    local s = Instance.new("Sound")
+    s.SoundId = "rbxassetid://126347354635406"; s.Volume = 0.6
+    s.Parent = SoundService; s:Play()
+    game:GetService("Debris"):AddItem(s, 2)
 end
 
--- Kiểm tra tự động nếu khớp ID thì chạy luôn
-if PVP_PLACE_IDS[placeId] then
-    loadRemoteScript()
-    return
+-- ═══════════════ TOAST ═══════════════
+local toastQueue = {}; local toastRunning = false
+local function ShowToast(msg, icon)
+    icon = icon or "✨"
+    table.insert(toastQueue, { msg = msg, icon = icon })
+    if toastRunning then return end
+    toastRunning = true
+    coroutine.wrap(function()
+        while #toastQueue > 0 do
+            local item = table.remove(toastQueue, 1)
+            local sg = Instance.new("ScreenGui", GetGuiParent())
+            sg.Name = "TokaiToast"; sg.IgnoreGuiInset = true; sg.ResetOnSpawn = false
+            local toastW = 220
+            local toast = Instance.new("Frame", sg)
+            toast.Size = UDim2.new(0, toastW, 0, 38)
+            toast.Position = UDim2.new(0.5, -toastW/2, 0, -44)
+            toast.BackgroundColor3 = Color3.fromRGB(255, 182, 193)
+            toast.BackgroundTransparency = 0.08
+            Instance.new("UICorner", toast).CornerRadius = UDim.new(0, 12)
+            local stroke = Instance.new("UIStroke", toast)
+            stroke.Color = Color3.fromRGB(235, 110, 140); stroke.Thickness = 1.5
+            local iconBg = Instance.new("Frame", toast)
+            iconBg.Size = UDim2.new(0, 32, 1, 0)
+            iconBg.BackgroundColor3 = Color3.fromRGB(235, 110, 140)
+            iconBg.BackgroundTransparency = 0.2
+            Instance.new("UICorner", iconBg).CornerRadius = UDim.new(0, 12)
+            local iconLbl = Instance.new("TextLabel", iconBg)
+            iconLbl.Size = UDim2.new(1, 0, 1, 0); iconLbl.Text = item.icon
+            iconLbl.Font = Enum.Font.GothamBold; iconLbl.TextSize = 16
+            iconLbl.BackgroundTransparency = 1; iconLbl.TextColor3 = Color3.new(1, 1, 1)
+            local msgLbl = Instance.new("TextLabel", toast)
+            msgLbl.Size = UDim2.new(1, -40, 1, 0); msgLbl.Position = UDim2.new(0, 36, 0, 0)
+            msgLbl.Text = item.msg; msgLbl.Font = Enum.Font.GothamBold; msgLbl.TextSize = 10
+            msgLbl.TextColor3 = Color3.fromRGB(90, 45, 55); msgLbl.BackgroundTransparency = 1
+            msgLbl.TextXAlignment = Enum.TextXAlignment.Left; msgLbl.TextWrapped = true
+            TweenService:Create(toast, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+                { Position = UDim2.new(0.5, -toastW/2, 0, 18) }):Play()
+            task.wait(2.2)
+            TweenService:Create(toast, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+                { Position = UDim2.new(0.5, -toastW/2, 0, -50), BackgroundTransparency = 1 }):Play()
+            task.wait(0.35); sg:Destroy(); task.wait(0.1)
+        end
+        toastRunning = false
+    end)()
 end
 
--- Nếu không khớp ID, hiện giao diện chọn thủ công
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "TokaiHubSelection"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = player:WaitForChild("PlayerGui")
+-- ═══════════════ UI LIBRARY ═══════════════
+local Library = {}
 
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 150)
-frame.Position = UDim2.new(0.5, -150, 0.5, -75)
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Draggable = true
-frame.Parent = screenGui
+function Library:CreateWindow()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "TOKAIHUB"
+    screenGui.Parent = GetGuiParent()
+    screenGui.ResetOnSpawn = false
+    screenGui.IgnoreGuiInset = true
 
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 10)
-corner.Parent = frame
+    do
+        local os2 = Instance.new("Sound")
+        os2.SoundId = "rbxassetid://90621979353525"; os2.Volume = 1
+        os2.Parent = SoundService; os2:Play()
+        game:GetService("Debris"):AddItem(os2, 5)
+    end
 
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 50)
-title.BackgroundTransparency = 1
-title.Text = "TOKAI HUB"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 20
-title.Parent = frame
+    local MainColor = Color3.fromRGB(255, 182, 193)
+    local TextColor = Color3.fromRGB(90, 45, 55)
+    local DarkPink  = Color3.fromRGB(235, 110, 140)
+    local Green     = Color3.fromRGB(34, 197, 94)
+    local Gray      = Color3.fromRGB(160, 160, 160)
 
-local loadButton = Instance.new("TextButton")
-loadButton.Size = UDim2.new(0.8, 0, 0, 50)
-loadButton.Position = UDim2.new(0.1, 0, 0.5, 0)
-loadButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-loadButton.Text = "Load PvP Script"
-loadButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-loadButton.Font = Enum.Font.GothamSemibold
-loadButton.TextSize = 18
-loadButton.Parent = frame
+    local openBtn = Instance.new("ImageButton", screenGui)
+    openBtn.Name = "OpenButton"; openBtn.Size = UDim2.new(0, 50, 0, 50)
+    openBtn.Position = UDim2.new(0, 10, 0.5, -25)
+    openBtn.BackgroundColor3 = MainColor
+    openBtn.Image = "rbxthumb://type=Asset&id=99217897221957&w=420&h=420"
+    openBtn.Visible = false
+    Instance.new("UICorner", openBtn).CornerRadius = UDim.new(1, 0)
+    local openStroke = Instance.new("UIStroke", openBtn); openStroke.Thickness = 3
 
-local bCorner = Instance.new("UICorner")
-bCorner.CornerRadius = UDim.new(0, 8)
-bCorner.Parent = loadButton
+    local screenW = Camera.ViewportSize.X
+    local FRAME_W = math.clamp(math.floor(screenW * 0.88), 300, 390)
+    local FRAME_H = 240
 
--- Xử lý khi bấm nút
-loadButton.MouseButton1Click:Connect(function()
-    loadButton.Text = "Loading..."
-    loadButton.Active = false
-    loadRemoteScript()
-    task.wait(1)
-    screenGui:Destroy()
+    local main = Instance.new("Frame")
+    main.Name = "MainFrame"
+    main.Size = UDim2.new(0, FRAME_W, 0, FRAME_H)
+    main.Position = UDim2.new(0.5, 0, 0.5, 0)
+    main.AnchorPoint = Vector2.new(0.5, 0.5)
+    main.BackgroundColor3 = MainColor
+    main.BackgroundTransparency = 0.3
+    main.Parent = screenGui
+    main.ClipsDescendants = false
+    Instance.new("UICorner", main).CornerRadius = UDim.new(0, 15)
+    local mainStroke = Instance.new("UIStroke", main); mainStroke.Thickness = 1
+
+    -- Toolbar
+    local toolbar = Instance.new("Frame", main)
+    toolbar.Size = UDim2.new(0, 30, 0, 95)
+    toolbar.Position = UDim2.new(1, 5, 0, 10)
+    toolbar.BackgroundColor3 = Color3.new(1, 1, 1)
+    toolbar.BackgroundTransparency = 0.5
+    Instance.new("UICorner", toolbar).CornerRadius = UDim.new(0, 8)
+    local tbl = Instance.new("UIListLayout", toolbar)
+    tbl.Padding = UDim.new(0, 5)
+    tbl.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    tbl.VerticalAlignment   = Enum.VerticalAlignment.Center
+
+    local function MakeToolBtn(txt, col)
+        local b = Instance.new("TextButton", toolbar)
+        b.Size = UDim2.new(0, 22, 0, 22); b.BackgroundColor3 = col
+        b.Text = txt; b.TextColor3 = Color3.new(1, 1, 1)
+        b.Font = Enum.Font.GothamBold; b.TextSize = 13
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 5)
+        return b
+    end
+    local closeBtn = MakeToolBtn("-",  Color3.fromRGB(235, 80, 80))
+    local lockBtn  = MakeToolBtn("🔓", Color3.fromRGB(80, 200, 80))
+    local keyBtn   = MakeToolBtn("⌨",  DarkPink)
+
+    local isTweening = false
+    local function ToggleUI()
+        if isTweening then return end; isTweening = true
+        if main.Visible then
+            TweenService:Create(main, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In),
+                { Size = UDim2.new(0, 0, 0, 0) }):Play()
+            task.delay(0.4, function()
+                main.Visible = false; openBtn.Visible = true; isTweening = false
+            end)
+        else
+            openBtn.Visible = false; main.Visible = true; main.Size = UDim2.new(0, 0, 0, 0)
+            local tw = TweenService:Create(main, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+                { Size = UDim2.new(0, FRAME_W, 0, FRAME_H) })
+            tw:Play(); tw.Completed:Connect(function() isTweening = false end)
+        end
+    end
+
+    closeBtn.MouseButton1Click:Connect(function() PlayClickSound(); ToggleUI() end)
+    lockBtn.MouseButton1Click:Connect(function()
+        PlayClickSound(); isLocked = not isLocked
+        lockBtn.Text = isLocked and "🔒" or "🔓"
+        lockBtn.BackgroundColor3 = isLocked and Color3.fromRGB(200, 80, 80) or Color3.fromRGB(80, 200, 80)
+    end)
+    local isBinding = false
+    keyBtn.MouseButton1Click:Connect(function()
+        if isBinding then return end
+        PlayClickSound(); isBinding = true; keyBtn.Text = "..."
+        local c; c = UserInputService.InputBegan:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.Keyboard then
+                _G.ToggleKey = inp.KeyCode; keyBtn.Text = "⌨"; isBinding = false; c:Disconnect()
+            end
+        end)
+    end)
+
+    -- Animated stroke
+    coroutine.wrap(function()
+        local cols = { Color3.fromRGB(255,255,255), Color3.fromRGB(255,192,203), Color3.fromRGB(230,190,255) }
+        while task.wait() do
+            local t = (math.sin(tick() * 2) + 1) / 2
+            local c = cols[1]:Lerp(cols[2], t):Lerp(cols[3], (math.cos(tick() * 1.5) + 1) / 2)
+            mainStroke.Color = c; openStroke.Color = c
+        end
+    end)()
+
+    openBtn.MouseButton1Click:Connect(function() PlayClickSound(); ToggleUI() end)
+    UserInputService.InputBegan:Connect(function(inp, gpe)
+        if not gpe and inp.KeyCode == _G.ToggleKey then PlayClickSound(); ToggleUI() end
+    end)
+
+    -- Drag
+    local dragLocked = false
+    local function EnableDrag(obj)
+        local dragging, dragInput, dragStart, startPos
+        obj.InputBegan:Connect(function(inp)
+            if isLocked or dragLocked then return end
+            if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then
+                dragging = true; dragStart = inp.Position; startPos = obj.Position
+                inp.Changed:Connect(function()
+                    if inp.UserInputState == Enum.UserInputState.End then dragging = false end
+                end)
+            end
+        end)
+        obj.InputChanged:Connect(function(inp)
+            if not isLocked and not dragLocked
+            and (inp.UserInputType == Enum.UserInputType.MouseMovement
+              or inp.UserInputType == Enum.UserInputType.Touch) then
+                dragInput = inp
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(inp)
+            if inp == dragInput and dragging and not isLocked and not dragLocked then
+                local d = inp.Position - dragStart
+                obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X,
+                                         startPos.Y.Scale, startPos.Y.Offset + d.Y)
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then
+                dragging = false; dragLocked = false
+            end
+        end)
+    end
+
+    local function AttachScrollLock(sf)
+        local touchStart = nil
+        sf.InputBegan:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.Touch then touchStart = inp.Position end
+        end)
+        sf.InputChanged:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.Touch and touchStart then
+                local dy = math.abs(inp.Position.Y - touchStart.Y)
+                local dx = math.abs(inp.Position.X - touchStart.X)
+                if dy > dx and dy > 6 then dragLocked = true end
+            end
+        end)
+        sf.InputEnded:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.Touch then
+                touchStart = nil; dragLocked = false
+            end
+        end)
+    end
+
+    EnableDrag(main); EnableDrag(openBtn)
+
+    -- Sidebar
+    local sidebar = Instance.new("Frame", main)
+    sidebar.Size = UDim2.new(0, 35, 0, 200)
+    sidebar.Position = UDim2.new(1, -40, 0.5, -100)
+    sidebar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    sidebar.BackgroundTransparency = 0.65
+    Instance.new("UICorner", sidebar).CornerRadius = UDim.new(1, 0)
+    local sbl = Instance.new("UIListLayout", sidebar)
+    sbl.Padding = UDim.new(0, 7)
+    sbl.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    sbl.VerticalAlignment   = Enum.VerticalAlignment.Center
+
+    local tabContainer = Instance.new("Frame", main)
+    tabContainer.Size = UDim2.new(0, 335, 0, 215)
+    tabContainer.Position = UDim2.new(0, 8, 0, 10)
+    tabContainer.BackgroundTransparency = 1
+    tabContainer.ClipsDescendants = true
+
+    local pages = Instance.new("Frame", tabContainer)
+    pages.Size = UDim2.new(1, 0, 1, 0)
+    pages.BackgroundTransparency = 1
+    pages.Active = false
+
+    -- ══════════════════════════════════
+    --   ELEMENT HELPERS
+    -- ══════════════════════════════════
+
+    -- BUTTON
+    local function MakeButton(parent, text, yPos, callback, toastMsg, toastIcon)
+        local btn = Instance.new("TextButton", parent)
+        btn.Size = UDim2.new(1, -4, 0, 28); btn.Position = UDim2.new(0, 2, 0, yPos)
+        btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        btn.BackgroundTransparency = 0.45
+        btn.Text = text; btn.Font = Enum.Font.GothamBold
+        btn.TextColor3 = TextColor; btn.TextSize = 10
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 7)
+        local stroke = Instance.new("UIStroke", btn)
+        stroke.Color = DarkPink; stroke.Thickness = 1.2
+        btn.MouseButton1Click:Connect(function()
+            PlayClickSound()
+            TweenService:Create(btn, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                { BackgroundColor3 = Color3.fromRGB(255, 210, 220) }):Play()
+            task.delay(0.08, function()
+                TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+                    { BackgroundColor3 = Color3.fromRGB(255, 255, 255) }):Play()
+            end)
+            if toastMsg  then ShowToast(toastMsg, toastIcon) end
+            if callback  then callback() end
+        end)
+        btn.MouseEnter:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.15),
+                { BackgroundColor3 = Color3.fromRGB(255, 230, 235) }):Play()
+        end)
+        btn.MouseLeave:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.15),
+                { BackgroundColor3 = Color3.fromRGB(255, 255, 255) }):Play()
+        end)
+        return btn
+    end
+
+    -- TOGGLE (pill)
+    local function MakeToggle(parent, labelText, yPos, savedKey, onCallback)
+        local state = S[savedKey] or false
+        local row = Instance.new("Frame", parent)
+        row.Size = UDim2.new(1, -4, 0, 26); row.Position = UDim2.new(0, 2, 0, yPos)
+        row.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        row.BackgroundTransparency = 0.45
+        Instance.new("UICorner", row).CornerRadius = UDim.new(0, 7)
+        local lbl = Instance.new("TextLabel", row)
+        lbl.Size = UDim2.new(0.7, 0, 1, 0); lbl.Position = UDim2.new(0, 8, 0, 0)
+        lbl.Text = labelText; lbl.Font = Enum.Font.GothamBold
+        lbl.TextColor3 = TextColor; lbl.TextSize = 9
+        lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.BackgroundTransparency = 1
+        local pill = Instance.new("Frame", row)
+        pill.Size = UDim2.new(0, 36, 0, 16); pill.Position = UDim2.new(1, -42, 0.5, -8)
+        pill.BackgroundColor3 = state and Green or Gray
+        Instance.new("UICorner", pill).CornerRadius = UDim.new(1, 0)
+        local knob = Instance.new("Frame", pill)
+        knob.Size = UDim2.new(0, 12, 0, 12)
+        knob.Position = state and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6)
+        knob.BackgroundColor3 = Color3.new(1, 1, 1)
+        Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+        local function SetState(ns)
+            state = ns; S[savedKey] = state; Save()
+            TweenService:Create(pill, TweenInfo.new(0.2),
+                { BackgroundColor3 = state and Green or Gray }):Play()
+            TweenService:Create(knob, TweenInfo.new(0.2),
+                { Position = state and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6) }):Play()
+            if onCallback then onCallback(state) end
+        end
+        local btn = Instance.new("TextButton", row)
+        btn.Size = UDim2.new(1, 0, 1, 0); btn.BackgroundTransparency = 1; btn.Text = ""
+        btn.MouseButton1Click:Connect(function() PlayClickSound(); SetState(not state) end)
+        if state and onCallback then
+            task.spawn(function() task.wait(1.2); onCallback(true) end)
+        end
+        return row
+    end
+
+    -- SLIDER
+    local function MakeSlider(parent, labelText, yPos, min, max, savedKey, suffix, onCallback)
+        local value = S[savedKey] or min
+        local KNOB_W = 13
+        local row = Instance.new("Frame", parent)
+        row.Size = UDim2.new(1, -4, 0, 40); row.Position = UDim2.new(0, 2, 0, yPos)
+        row.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        row.BackgroundTransparency = 0.45; row.ClipsDescendants = false
+        Instance.new("UICorner", row).CornerRadius = UDim.new(0, 7)
+        local lbl = Instance.new("TextLabel", row)
+        lbl.Size = UDim2.new(0.6, 0, 0, 18); lbl.Position = UDim2.new(0, 8, 0, 2)
+        lbl.Text = labelText; lbl.Font = Enum.Font.GothamBold
+        lbl.TextColor3 = TextColor; lbl.TextSize = 9
+        lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.BackgroundTransparency = 1
+        local valLbl = Instance.new("TextLabel", row)
+        valLbl.Size = UDim2.new(0.35, 0, 0, 18); valLbl.Position = UDim2.new(0.62, 0, 0, 2)
+        valLbl.Text = tostring(value) .. suffix; valLbl.Font = Enum.Font.GothamBold
+        valLbl.TextColor3 = DarkPink; valLbl.TextSize = 9
+        valLbl.TextXAlignment = Enum.TextXAlignment.Right; valLbl.BackgroundTransparency = 1
+        local TRACK_PAD = 8 + math.ceil(KNOB_W / 2)
+        local track = Instance.new("Frame", row)
+        track.Size = UDim2.new(1, -(TRACK_PAD * 2), 0, 6)
+        track.Position = UDim2.new(0, TRACK_PAD, 0, 27)
+        track.BackgroundColor3 = Color3.fromRGB(220, 190, 200)
+        track.ClipsDescendants = false
+        Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+        local fill = Instance.new("Frame", track)
+        fill.Size = UDim2.new((value - min) / (max - min), 0, 1, 0)
+        fill.BackgroundColor3 = DarkPink
+        Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+        local initPct = (value - min) / (max - min)
+        local knob = Instance.new("Frame", track)
+        knob.Size = UDim2.new(0, KNOB_W, 0, KNOB_W)
+        knob.Position = UDim2.new(initPct, -math.floor(KNOB_W * initPct), 0.5, -math.ceil(KNOB_W / 2))
+        knob.BackgroundColor3 = Color3.new(1, 1, 1)
+        Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+        local ks = Instance.new("UIStroke", knob); ks.Color = DarkPink; ks.Thickness = 1.5
+        local dragging = false
+        local function UpdateFromX(absX)
+            local pct = math.clamp((absX - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+            value = math.floor(min + pct * (max - min))
+            S[savedKey] = value; Save()
+            valLbl.Text = tostring(value) .. suffix
+            fill.Size = UDim2.new(pct, 0, 1, 0)
+            knob.Position = UDim2.new(pct, -math.floor(KNOB_W * pct), 0.5, -math.ceil(KNOB_W / 2))
+            if onCallback then onCallback(value) end
+        end
+        knob.InputBegan:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then dragging = true end
+        end)
+        track.InputBegan:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then
+                dragging = true; UpdateFromX(inp.Position.X)
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(inp)
+            if dragging and (inp.UserInputType == Enum.UserInputType.MouseMovement
+            or inp.UserInputType == Enum.UserInputType.Touch) then UpdateFromX(inp.Position.X) end
+        end)
+        UserInputService.InputEnded:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1
+            or inp.UserInputType == Enum.UserInputType.Touch then dragging = false end
+        end)
+        return row
+    end
+
+    -- DROPDOWN (tùy chọn — nhấn hiện danh sách chọn)
+    local function MakeDropdown(parent, labelText, yPos, options, savedKey, onCallback)
+        local selected = S[savedKey] or options[1]
+        local isOpen   = false
+        local ITEM_H   = 24
+
+        -- Container (tự mở rộng khi mở)
+        local container = Instance.new("Frame", parent)
+        container.Size = UDim2.new(1, -4, 0, 30)
+        container.Position = UDim2.new(0, 2, 0, yPos)
+        container.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        container.BackgroundTransparency = 0.45
+        container.ClipsDescendants = false
+        Instance.new("UICorner", container).CornerRadius = UDim.new(0, 7)
+        local stroke = Instance.new("UIStroke", container)
+        stroke.Color = DarkPink; stroke.Thickness = 1.2
+
+        -- Header button
+        local header = Instance.new("TextButton", container)
+        header.Size = UDim2.new(1, 0, 0, 30); header.BackgroundTransparency = 1
+        header.Text = ""; header.Font = Enum.Font.GothamBold
+        local lblLeft = Instance.new("TextLabel", header)
+        lblLeft.Size = UDim2.new(0.6, 0, 1, 0); lblLeft.Position = UDim2.new(0, 8, 0, 0)
+        lblLeft.Text = labelText; lblLeft.Font = Enum.Font.GothamBold
+        lblLeft.TextColor3 = TextColor; lblLeft.TextSize = 9
+        lblLeft.TextXAlignment = Enum.TextXAlignment.Left; lblLeft.BackgroundTransparency = 1
+        local lblRight = Instance.new("TextLabel", header)
+        lblRight.Size = UDim2.new(0.35, 0, 1, 0); lblRight.Position = UDim2.new(0.6, 0, 0, 0)
+        lblRight.Text = selected .. " ▾"; lblRight.Font = Enum.Font.GothamBold
+        lblRight.TextColor3 = DarkPink; lblRight.TextSize = 9
+        lblRight.TextXAlignment = Enum.TextXAlignment.Right; lblRight.BackgroundTransparency = 1
+
+        -- Dropdown list frame (con của screenGui để tránh clip)
+        local dropList = Instance.new("Frame", screenGui)
+        dropList.BackgroundColor3 = Color3.fromRGB(255, 240, 245)
+        dropList.BackgroundTransparency = 0.05
+        dropList.Size = UDim2.new(0, 0, 0, 0)
+        dropList.Visible = false; dropList.ZIndex = 20
+        dropList.ClipsDescendants = true
+        Instance.new("UICorner", dropList).CornerRadius = UDim.new(0, 7)
+        local dStroke = Instance.new("UIStroke", dropList)
+        dStroke.Color = DarkPink; dStroke.Thickness = 1.2
+
+        -- Build option buttons
+        local itemBtns = {}
+        for i, opt in ipairs(options) do
+            local item = Instance.new("TextButton", dropList)
+            item.Size = UDim2.new(1, 0, 0, ITEM_H)
+            item.Position = UDim2.new(0, 0, 0, (i - 1) * ITEM_H)
+            item.BackgroundTransparency = 1; item.Text = opt
+            item.Font = Enum.Font.GothamBold; item.TextSize = 9
+            item.TextColor3 = TextColor; item.ZIndex = 21
+            item.MouseButton1Click:Connect(function()
+                PlayClickSound()
+                selected = opt; S[savedKey] = selected; Save()
+                lblRight.Text = selected .. " ▾"
+                if onCallback then onCallback(selected) end
+                -- Close
+                isOpen = false
+                lblRight.Text = selected .. " ▾"
+                TweenService:Create(dropList, TweenInfo.new(0.15),
+                    { Size = UDim2.new(0, dropList.Size.X.Offset, 0, 0),
+                      BackgroundTransparency = 1 }):Play()
+                task.delay(0.16, function() dropList.Visible = false end)
+            end)
+            item.MouseEnter:Connect(function()
+                TweenService:Create(item, TweenInfo.new(0.1),
+                    { BackgroundTransparency = 0.7 }):Play()
+                item.BackgroundColor3 = DarkPink
+            end)
+            item.MouseLeave:Connect(function()
+                TweenService:Create(item, TweenInfo.new(0.1),
+                    { BackgroundTransparency = 1 }):Play()
+            end)
+            table.insert(itemBtns, item)
+        end
+
+        local listH = #options * ITEM_H
+        local listW = 160  -- fixed width for dropdown
+
+        header.MouseButton1Click:Connect(function()
+            PlayClickSound()
+            isOpen = not isOpen
+            if isOpen then
+                -- Position dropdown below header in screen space
+                local absPos  = container.AbsolutePosition
+                local absSize = container.AbsoluteSize
+                dropList.Position = UDim2.new(0, absPos.X + 2, 0, absPos.Y + absSize.Y + 2)
+                dropList.Size     = UDim2.new(0, listW, 0, 0)
+                dropList.BackgroundTransparency = 0.05
+                dropList.Visible  = true
+                TweenService:Create(dropList, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+                    { Size = UDim2.new(0, listW, 0, listH) }):Play()
+            else
+                TweenService:Create(dropList, TweenInfo.new(0.15),
+                    { Size = UDim2.new(0, listW, 0, 0) }):Play()
+                task.delay(0.16, function() dropList.Visible = false end)
+            end
+        end)
+
+        return container, (#options * ITEM_H)
+    end
+
+    -- SECTION LABEL
+    local function MakeSection(parent, text, yPos)
+        local lbl = Instance.new("TextLabel", parent)
+        lbl.Size = UDim2.new(1, -4, 0, 18); lbl.Position = UDim2.new(0, 2, 0, yPos)
+        lbl.Text = "── " .. text .. " ──"; lbl.Font = Enum.Font.GothamBold
+        lbl.TextColor3 = DarkPink; lbl.TextSize = 9; lbl.BackgroundTransparency = 1
+        return lbl
+    end
+
+    -- ══════════════════════════════════
+    --   CREATE TAB
+    -- ══════════════════════════════════
+    local isFirstTab = true
+
+    function Library:CreateTab(name, iconText)
+        local page = Instance.new("ScrollingFrame", pages)
+        page.Name = name .. "Page"; page.Size = UDim2.new(1, 0, 1, 0)
+        page.BackgroundTransparency = 1; page.Visible = false
+        page.ScrollBarThickness = 0
+        page.CanvasSize = UDim2.new(0, 0, 0, 0)
+        page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        page.ScrollingDirection = Enum.ScrollingDirection.Y
+        page.ElasticBehavior = Enum.ElasticBehavior.Never
+        page.ScrollingEnabled = true; page.ClipsDescendants = true
+        AttachScrollLock(page)
+
+        local tabBtn = Instance.new("TextButton", sidebar)
+        tabBtn.Size = UDim2.new(0, 27, 0, 27); tabBtn.BackgroundColor3 = DarkPink
+        tabBtn.BackgroundTransparency = 0.2; tabBtn.Text = iconText or name:sub(1, 1)
+        tabBtn.TextScaled = true; tabBtn.Font = Enum.Font.GothamBold
+        tabBtn.TextColor3 = Color3.new(1, 1, 1)
+        Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(1, 0)
+        local tabStroke = Instance.new("UIStroke", tabBtn)
+        tabStroke.Color = Color3.new(1, 1, 1); tabStroke.Thickness = 2
+        tabStroke.Transparency = 1; tabStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+        tabBtn.MouseButton1Click:Connect(function()
+            PlayClickSound()
+            for _, v in pairs(pages:GetChildren()) do
+                if v:IsA("ScrollingFrame") then v.Visible = false end
+            end
+            for _, b in pairs(sidebar:GetChildren()) do
+                if b:IsA("TextButton") then
+                    TweenService:Create(b, TweenInfo.new(0.15), { BackgroundTransparency = 0.2 }):Play()
+                    local s = b:FindFirstChildOfClass("UIStroke")
+                    if s then TweenService:Create(s, TweenInfo.new(0.15), { Transparency = 1 }):Play() end
+                end
+            end
+            page.Visible = true
+            TweenService:Create(tabBtn, TweenInfo.new(0.15), { BackgroundTransparency = 0 }):Play()
+            TweenService:Create(tabStroke, TweenInfo.new(0.2), { Transparency = 0 }):Play()
+        end)
+
+        -- First tab = default active
+        if isFirstTab then
+            isFirstTab = false
+            page.Visible = true
+            TweenService:Create(tabBtn, TweenInfo.new(0.1), { BackgroundTransparency = 0 }):Play()
+            TweenService:Create(tabStroke, TweenInfo.new(0.2), { Transparency = 0 }):Play()
+        end
+
+        local yOffset  = 4
+        local elements = {}
+
+        --[[ AddButton
+             Nút bấm có animation. Khi nhấn chạy callback + hiện toast.
+             VÍ DỤ:
+               tab:AddButton("Reset Character", function()
+                   Players.LocalPlayer:LoadCharacter()
+               end, "Đã reset!", "💨")
+        --]]
+        function elements:AddButton(text, callback, toastMsg, toastIcon)
+            MakeButton(page, text, yOffset, callback, toastMsg, toastIcon)
+            yOffset = yOffset + 32
+        end
+
+        --[[ AddToggle
+             Toggle pill bật/tắt, tự lưu state theo savedKey.
+             VÍ DỤ:
+               tab:AddToggle("Noclip", "noclip", function(state)
+                   -- state = true/false
+               end)
+        --]]
+        function elements:AddToggle(text, savedKey, callback)
+            MakeToggle(page, text, yOffset, savedKey, callback)
+            yOffset = yOffset + 30
+        end
+
+        --[[ AddSlider
+             Thanh trượt giá trị số, tự lưu theo savedKey.
+             VÍ DỤ:
+               tab:AddSlider("Walk Speed", 4, 100, "speed", " sp", function(v)
+                   -- v = giá trị hiện tại
+               end)
+        --]]
+        function elements:AddSlider(text, min, max, savedKey, suffix, callback)
+            MakeSlider(page, text, yOffset, min, max, savedKey, suffix or "", callback)
+            yOffset = yOffset + 44
+        end
+
+        --[[ AddDropdown
+             Thanh tùy chọn — nhấn mở danh sách, chọn một mục.
+             options = bảng string, savedKey để lưu, callback(selected).
+             VÍ DỤ:
+               tab:AddDropdown("Aim Part", {"Head","Body","Torso"}, "aimPart", function(v)
+                   -- v = "Head" hoặc "Body" hoặc "Torso"
+               end)
+        --]]
+        function elements:AddDropdown(text, options, savedKey, callback)
+            MakeDropdown(page, text, yOffset, options, savedKey, callback)
+            yOffset = yOffset + 34   -- header height only; list floats above
+        end
+
+        --[[ AddSection
+             Tiêu đề phân cách giữa các nhóm element.
+             VÍ DỤ:
+               tab:AddSection("Movement")
+        --]]
+        function elements:AddSection(text)
+            MakeSection(page, text, yOffset)
+            yOffset = yOffset + 22
+        end
+
+        return elements
+    end
+
+    return Library
+end
+
+-- ════════════════════════════════════════════════════
+--   SETUP — tạo window và tabs ở đây
+--   Xóa ví dụ bên dưới và thêm tab + element của bạn
+-- ════════════════════════════════════════════════════
+local win = Library:CreateWindow()
+
+-- ── VÍ DỤ: Tab 1 ─────────────────────────────────────────────────────────────
+local tab1 = win:CreateTab("Tab 1", "1")
+
+tab1:AddSection("Buttons")
+tab1:AddButton("Button ví dụ", function()
+    print("Button clicked!")
+end, "Button đã bấm!", "✅")
+
+tab1:AddSection("Toggles")
+tab1:AddToggle("Toggle ví dụ", "exampleToggle", function(state)
+    print("Toggle:", state)
 end)
+
+tab1:AddSection("Sliders")
+tab1:AddSlider("Slider ví dụ", 0, 100, "exampleSlider", "%", function(v)
+    print("Slider value:", v)
+end)
+
+tab1:AddSection("Dropdown")
+tab1:AddDropdown("Chọn ví dụ", {"Head", "Body", "Torso"}, "exampleDrop", function(v)
+    print("Selected:", v)
+end)
+
+-- ── VÍ DỤ: Tab 2 ─────────────────────────────────────────────────────────────
+local tab2 = win:CreateTab("Tab 2", "2")
+tab2:AddSection("Đây là Tab 2")
+tab2:AddButton("Button Tab 2", function() print("Tab 2 button!") end)
