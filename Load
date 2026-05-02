@@ -325,107 +325,101 @@ function Library:CreateWindow()
     end)()
 
     -- ══ BORDER RUNNER ══
-    -- Dùng nhiều dot nhỏ dày đặc (GAP=1px) tạo thanh liên tục mượt
-    -- Dot là hình chữ nhật mỏng 3x3, không tròn hoàn toàn → trông như vệt sáng
-    local function BuildPath(W, H)
-        local R    = 15
-        local PI   = math.pi
-        local path = {}
+    -- Mỗi cạnh là 1 clip Frame riêng → thanh chạy dọc cạnh đó không bị tràn ra ngoài
+    -- Dùng UIGradient để tạo hiệu ứng sáng fade 2 đầu như ảnh
+    local function SpawnEdgeRunners(parent, W, H)
+        local R      = 15
+        local THICK  = 3      -- bề dày thanh (px)
 
-        -- 2 điểm mỗi px để path đủ mịn ở góc cong
-        local function pushLine(x1,y1,x2,y2)
-            local dx,dy = x2-x1, y2-y1
-            local len = math.sqrt(dx*dx+dy*dy)
-            local steps = math.floor(len * 2)   -- 2x density
-            for i=0,steps do
-                local t = i/steps
-                table.insert(path, {x1+dx*t, y1+dy*t})
+        -- Định nghĩa 4 cạnh: vị trí clip, chiều dài, hướng chạy của thanh
+        -- Mỗi cạnh có 1 clip Frame vừa khít cạnh đó, ClipsDescendants=true
+        -- Thanh (bar) chạy bên trong clip → tự bị cắt gọn tại góc
+        local edges = {
+            -- top: ngang, từ trái sang phải
+            { cx=0,    cy=-THICK/2,  cw=W,        ch=THICK*2,
+              axis="x", len=W,       color=Color3.fromRGB(255,140,185), speed=110, rev=false, phase=0    },
+            -- bottom: ngang, từ phải sang trái
+            { cx=0,    cy=H-THICK/2, cw=W,        ch=THICK*2,
+              axis="x", len=W,       color=Color3.fromRGB(200,160,255), speed=110, rev=true,  phase=0.4  },
+            -- right: dọc, từ trên xuống
+            { cx=W-THICK/2, cy=0,   cw=THICK*2,  ch=H,
+              axis="y", len=H,       color=Color3.fromRGB(255,140,185), speed=80,  rev=false, phase=0.2  },
+            -- left: dọc, từ dưới lên
+            { cx=-THICK/2,  cy=0,   cw=THICK*2,  ch=H,
+              axis="y", len=H,       color=Color3.fromRGB(200,160,255), speed=80,  rev=true,  phase=0.6  },
+        }
+
+        -- Độ dài thanh sáng = 22% chu vi cạnh đó, tối thiểu 40px
+        for _, e in ipairs(edges) do
+            local BAR_LEN = math.max(40, math.floor(e.len * 0.22))
+
+            -- Clip container: vừa khít cạnh, clips children
+            local clip = Instance.new("Frame", parent)
+            clip.Position         = UDim2.new(0, e.cx, 0, e.cy)
+            clip.Size             = UDim2.new(0, e.cw, 0, e.ch)
+            clip.BackgroundTransparency = 1
+            clip.ClipsDescendants = true
+            clip.ZIndex           = 9
+
+            -- Thanh sáng bên trong clip
+            local bar = Instance.new("Frame", clip)
+            bar.BackgroundColor3  = e.color
+            bar.BackgroundTransparency = 0
+            bar.BorderSizePixel   = 0
+            bar.ZIndex            = 10
+            Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
+
+            -- Gradient fade 2 đầu: trong suốt → sáng → trong suốt
+            local grad = Instance.new("UIGradient", bar)
+            grad.Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0,    1  ),
+                NumberSequenceKeypoint.new(0.15, 0.05),
+                NumberSequenceKeypoint.new(0.5,  0  ),
+                NumberSequenceKeypoint.new(0.85, 0.05),
+                NumberSequenceKeypoint.new(1,    1  ),
+            })
+
+            if e.axis == "x" then
+                bar.Size       = UDim2.new(0, BAR_LEN, 0, THICK)
+                bar.AnchorPoint = Vector2.new(0, 0.5)
+                bar.Position   = UDim2.new(0, e.rev and e.len or -BAR_LEN, 0.5, 0)
+                grad.Rotation  = 0
+            else
+                bar.Size       = UDim2.new(0, THICK, 0, BAR_LEN)
+                bar.AnchorPoint = Vector2.new(0.5, 0)
+                bar.Position   = UDim2.new(0.5, 0, 0, e.rev and e.len or -BAR_LEN)
+                grad.Rotation  = 90
             end
-        end
-        local function pushArc(cx,cy,a0,a1)
-            local steps = math.floor(math.abs(a1-a0) * R * 2)  -- 2x density
-            for i=0,steps do
-                local a = a0+(a1-a0)*(i/steps)
-                table.insert(path, {cx+R*math.cos(a), cy+R*math.sin(a)})
-            end
-        end
 
-        pushArc(R,   R,   PI,    PI*1.5)
-        pushLine(R,  0,   W-R,   0     )
-        pushArc(W-R, R,   PI*1.5, PI*2 )
-        pushLine(W,  R,   W,     H-R   )
-        pushArc(W-R, H-R, 0,    PI*0.5 )
-        pushLine(W-R,H,   R,     H     )
-        pushArc(R,   H-R, PI*0.5, PI   )
-        pushLine(0,  H-R, 0,     R     )
-        return path
-    end
+            -- Animate: loop chạy qua lại liên tục
+            coroutine.wrap(function()
+                task.wait(e.phase)
+                while true do
+                    local startX = e.rev and (e.len + BAR_LEN)  or -BAR_LEN
+                    local endX   = e.rev and -BAR_LEN            or (e.len + BAR_LEN)
+                    local dur    = (e.len + BAR_LEN * 2) / e.speed
 
-    local function SpawnRunner(parent, path, dotColor, speed, reverse)
-        local NDOTS = 55      -- nhiều dot hơn → thanh dài mượt hơn
-        local GAP   = 1.0    -- 1px/dot → dày đặc, gần như liên tục
-        local THICK = 3
-        local totalPts = #path
-
-        local dots = {}
-        for i=1,NDOTS do
-            local dot = Instance.new("Frame", parent)
-            dot.Size            = UDim2.new(0, THICK, 0, THICK)
-            dot.AnchorPoint     = Vector2.new(0.5, 0.5)
-            dot.BackgroundColor3 = dotColor
-            dot.BackgroundTransparency = 1
-            dot.BorderSizePixel = 0
-            dot.ZIndex          = 9
-            -- Bo nhẹ chứ không tròn hẳn → trông thanh hơn
-            Instance.new("UICorner", dot).CornerRadius = UDim.new(0, 1)
-            dots[i] = dot
-        end
-
-        coroutine.wrap(function()
-            local headPos = 0
-            local last    = tick()
-            while true do
-                RunService.Heartbeat:Wait()
-                local now = tick()
-                local dt  = now-last; last = now
-                if reverse then
-                    headPos = (headPos - speed*dt) % totalPts
-                    if headPos < 0 then headPos = totalPts + headPos end
-                else
-                    headPos = (headPos + speed*dt) % totalPts
-                end
-
-                for i = 1, NDOTS do
-                    local idx
-                    if reverse then
-                        idx = math.floor(headPos + i*GAP) % totalPts
+                    if e.axis == "x" then
+                        bar.Position = UDim2.new(0, startX, 0.5, 0)
+                        TweenService:Create(bar,
+                            TweenInfo.new(dur, Enum.EasingStyle.Linear),
+                            {Position = UDim2.new(0, endX, 0.5, 0)}):Play()
                     else
-                        idx = math.floor(headPos - i*GAP) % totalPts
+                        bar.Position = UDim2.new(0.5, 0, 0, startX)
+                        TweenService:Create(bar,
+                            TweenInfo.new(dur, Enum.EasingStyle.Linear),
+                            {Position = UDim2.new(0.5, 0, 0, endX)}):Play()
                     end
-                    if idx <= 0 then idx = totalPts + idx end
-                    local pt = path[idx]
-                    if pt then
-                        -- fade: đầu sáng, đuôi mờ dần theo cubic
-                        local t = (i-1)/(NDOTS-1)
-                        local alpha = (1-t)^1.6   -- cubic falloff
-                        dots[i].BackgroundTransparency = 1 - alpha * 0.95
-                        dots[i].Position = UDim2.new(0, pt[1], 0, pt[2])
-                    end
+                    task.wait(dur)
                 end
-            end
-        end)()
+            end)()
+        end
     end
 
     -- Spawn sau khi UI render xong
     task.defer(function()
         task.wait(0.6)
-        local path = BuildPath(FRAME_W, FRAME_H)
-        -- Thanh hồng chạy thuận chiều kim đồng hồ
-        SpawnRunner(main, path, Color3.fromRGB(255,130,180), 95,  false)
-        -- Thanh tím chạy NGƯỢC chiều kim đồng hồ
-        SpawnRunner(main, path, Color3.fromRGB(195,155,255), 85,  true)
-        -- Thanh trắng nhỏ chạy thuận, nhanh hơn
-        SpawnRunner(main, path, Color3.fromRGB(255,255,255), 140, false)
+        SpawnEdgeRunners(main, FRAME_W, FRAME_H)
     end)
 
     openBtn.MouseButton1Click:Connect(function() PlayClickSound(); ToggleUI() end)
@@ -1092,13 +1086,12 @@ function Library:CreateWindow()
             Instance.new("UICorner", clockBox).CornerRadius = UDim.new(0,10)
 
             do
-                -- Mây: dùng UIGradient thay vì Frame đặc để không tạo bóng khi overlap
                 local cloudData = {
-                    {x=-8,  y=60, w=68, h=52, a=0.72},
-                    {x=44,  y=65, w=58, h=46, a=0.75},
-                    {x=92,  y=61, w=64, h=50, a=0.72},
-                    {x=140, y=66, w=54, h=44, a=0.75},
-                    {x=182, y=62, w=60, h=48, a=0.72},
+                    {x=-10, y=62, w=72, h=72, a=0.30},
+                    {x=42,  y=68, w=64, h=64, a=0.28},
+                    {x=90,  y=64, w=70, h=70, a=0.30},
+                    {x=138, y=70, w=60, h=60, a=0.28},
+                    {x=180, y=65, w=66, h=66, a=0.30},
                 }
                 for _, cd in ipairs(cloudData) do
                     local circle = Instance.new("Frame", clockBox)
@@ -1108,15 +1101,6 @@ function Library:CreateWindow()
                     circle.BackgroundTransparency = cd.a
                     circle.ZIndex = 1
                     Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
-                    -- Gradient fade cạnh để không tạo đường viền đậm khi overlap
-                    local g = Instance.new("UIGradient", circle)
-                    g.Transparency = NumberSequence.new({
-                        NumberSequenceKeypoint.new(0,   0.3),
-                        NumberSequenceKeypoint.new(0.35, 0),
-                        NumberSequenceKeypoint.new(0.65, 0),
-                        NumberSequenceKeypoint.new(1,   0.3),
-                    })
-                    g.Rotation = 0
                 end
             end
 
