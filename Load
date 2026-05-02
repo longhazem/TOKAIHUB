@@ -947,6 +947,8 @@ function Library:CreateWindow()
         tabStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
         tabBtn.MouseButton1Click:Connect(function()
+            -- Nếu tab này đang active rồi thì không làm gì
+            if page.Visible then return end
             PlayClickSound()
             -- Đóng dropdown nếu đang mở
             if activeDropdown then activeDropdown(true) end
