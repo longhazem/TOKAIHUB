@@ -311,6 +311,8 @@ function Library:CreateWindow()
         end)
     end)
 
+    -- ══ BORDER RUNNER: thanh chạy vòng quanh mép UI ══
+    -- Dùng UIStroke rainbow để giữ màu nền đẹp
     coroutine.wrap(function()
         local cols = {Color3.fromRGB(255,255,255),Color3.fromRGB(255,192,203),Color3.fromRGB(230,190,255)}
         while task.wait() do
@@ -319,6 +321,106 @@ function Library:CreateWindow()
             mainStroke.Color=c; openStroke.Color=c
         end
     end)()
+
+    -- Border runner: 2 thanh chạy ngược chiều quanh mép main
+    local function SpawnBorderRunner(parent, frameW, frameH, color, speed, delayStart)
+        -- Perimeter = 2*(W+H), R = corner radius = 15
+        local R     = 15
+        local THICK = 3
+        local SEGW  = 48   -- chiều dài thanh
+        local perim = 2*(frameW + frameH) - 8*R + 2*math.pi*R  -- chu vi thực
+
+        -- Thanh runner là Frame con, clipDescendants của parent
+        local clip = Instance.new("Frame", parent)
+        clip.Size = UDim2.new(1,0,1,0); clip.Position = UDim2.new(0,0,0,0)
+        clip.BackgroundTransparency = 1; clip.ClipsDescendants = false
+        clip.ZIndex = 8
+
+        local bar = Instance.new("Frame", clip)
+        bar.Size = UDim2.new(0,SEGW,0,THICK)
+        bar.BackgroundColor3 = color
+        bar.BackgroundTransparency = 0.0
+        bar.BorderSizePixel = 0
+        bar.ZIndex = 9
+        Instance.new("UICorner", bar).CornerRadius = UDim.new(1,0)
+        -- Gradient fade 2 đầu
+        local grad = Instance.new("UIGradient", bar)
+        grad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0,   Color3.new(1,1,1)),
+            ColorSequenceKeypoint.new(0.15, color),
+            ColorSequenceKeypoint.new(0.85, color),
+            ColorSequenceKeypoint.new(1,   Color3.new(1,1,1)),
+        })
+        grad.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0,   1),
+            NumberSequenceKeypoint.new(0.18, 0),
+            NumberSequenceKeypoint.new(0.82, 0),
+            NumberSequenceKeypoint.new(1,   1),
+        })
+
+        -- Waypoints theo chiều kim đồng hồ: top→right→bottom→left
+        -- offset từ góc (tính px), bar anchor = (0.5, 0.5)
+        -- top:    x từ R→W-R,   y = 0
+        -- right:  x = W,        y từ R→H-R  (bar xoay 90)
+        -- bottom: x từ W-R→R,   y = H
+        -- left:   x = 0,        y từ H-R→R  (bar xoay 90)
+        local W, H = frameW, frameH
+
+        -- Build waypoints: {x, y, rot, tLen}
+        -- tLen = normalised arc length tính theo px
+        local wp = {}
+        local function addSeg(x1,y1, x2,y2, rot)
+            local len = math.sqrt((x2-x1)^2+(y2-y1)^2)
+            table.insert(wp, {x1=x1,y1=y1, x2=x2,y2=y2, rot=rot, len=len})
+        end
+        addSeg(R,    0,   W-R,  0,    0)    -- top
+        addSeg(W,    R,   W,    H-R,  90)   -- right
+        addSeg(W-R,  H,   R,    H,    180)  -- bottom
+        addSeg(0,    H-R, 0,    R,    270)  -- left
+
+        local totalLen = 0
+        for _,s in ipairs(wp) do totalLen = totalLen + s.len end
+
+        task.wait(delayStart)
+        local pos = 0  -- px trên perimeter
+
+        coroutine.wrap(function()
+            local last = tick()
+            while true do
+                local now = tick()
+                local dt = now - last; last = now
+                pos = (pos + speed * dt) % totalLen
+
+                -- Tìm segment hiện tại
+                local acc = 0
+                for _, seg in ipairs(wp) do
+                    if pos <= acc + seg.len then
+                        local t = (pos - acc) / seg.len
+                        local bx = seg.x1 + (seg.x2-seg.x1)*t
+                        local by = seg.y1 + (seg.y2-seg.y1)*t
+                        bar.Position = UDim2.new(0, bx - SEGW/2, 0, by - THICK/2)
+                        bar.Rotation = seg.rot
+                        break
+                    end
+                    acc = acc + seg.len
+                end
+                RunService.Heartbeat:Wait()
+            end
+        end)()
+    end
+
+    -- Chờ main render xong rồi spawn runners
+    task.defer(function()
+        task.wait(0.5)
+        local W = FRAME_W
+        local H = FRAME_H
+        -- Runner 1: hồng chạy thuận
+        SpawnBorderRunner(main, W, H, Color3.fromRGB(255,150,190), 120, 0)
+        -- Runner 2: tím nhạt chạy thuận, lệch phase
+        SpawnBorderRunner(main, W, H, Color3.fromRGB(200,160,255), 100, 0.6)
+        -- Runner 3: trắng nhanh
+        SpawnBorderRunner(main, W, H, Color3.fromRGB(255,255,255), 160, 1.1)
+    end)
 
     openBtn.MouseButton1Click:Connect(function() PlayClickSound(); ToggleUI() end)
     UserInputService.InputBegan:Connect(function(inp,gpe)
@@ -687,14 +789,14 @@ function Library:CreateWindow()
 
         -- ── List (parent = screenGui, ZIndex cao, nằm TRONG screenGui chính) ──
         local listFrame = Instance.new("Frame", screenGui)
-        listFrame.BackgroundColor3 = Color3.fromRGB(255,248,251)
+        listFrame.BackgroundColor3 = Color3.fromRGB(255,243,247)   -- hồng nhạt, không đen
         listFrame.BackgroundTransparency = 0.0
         listFrame.Visible = false
         listFrame.ZIndex = 20
         listFrame.ClipsDescendants = true
         Instance.new("UICorner", listFrame).CornerRadius = UDim.new(0,8)
         local listStroke = Instance.new("UIStroke", listFrame)
-        listStroke.Color = DarkPink; listStroke.Thickness = 1.2; listStroke.Transparency = 0.3
+        listStroke.Color = DarkPink; listStroke.Thickness = 1.0; listStroke.Transparency = 0.4
 
         local function CloseList(instant)
             if not isOpen then return end
