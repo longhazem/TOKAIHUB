@@ -325,97 +325,107 @@ function Library:CreateWindow()
     end)()
 
     -- ══ BORDER RUNNER ══
-    -- Build path pixel-by-pixel theo đúng UICorner radius
-    -- Dot 3x3 px, bo nhẹ 1px → trông như vệt sáng liên tục, bẻ cong tại góc
+    -- Path build sẵn với normal vector để dot nằm ĐÚNG TRÊN VIỀN
+    -- Pre-compute toàn bộ alpha/color lookup → loop chỉ set Position + Transparency
     local function BuildBorderPath(W, H, R)
         local PI   = math.pi
         local path = {}
-        -- density: 3 điểm/px để góc cong thực sự mượt
-        local D = 3
+        -- density cao: 4 điểm/px → góc cong siêu mịn
+        local D    = 4
 
-        local function line(x1,y1,x2,y2)
+        -- Mỗi point: {x, y, nx, ny}  (nx,ny = outward normal, magnitude=1)
+        local function pushPt(x, y, nx, ny)
+            table.insert(path, {x, y, nx, ny})
+        end
+
+        local function line(x1,y1, x2,y2, nx,ny)
             local dx,dy = x2-x1, y2-y1
             local len   = math.sqrt(dx*dx+dy*dy)
             local steps = math.max(1, math.floor(len*D))
             for i=0,steps do
                 local t=i/steps
-                table.insert(path, {x1+dx*t, y1+dy*t})
+                pushPt(x1+dx*t, y1+dy*t, nx, ny)
             end
         end
-        local function arc(cx,cy,a0,a1)
+        local function arc(cx,cy, a0,a1)
             local steps = math.max(4, math.floor(math.abs(a1-a0)*R*D))
             for i=0,steps do
-                local a=a0+(a1-a0)*(i/steps)
-                table.insert(path, {cx+R*math.cos(a), cy+R*math.sin(a)})
+                local a  = a0+(a1-a0)*(i/steps)
+                local ca = math.cos(a); local sa = math.sin(a)
+                -- normal hướng ra ngoài = (cos,sin) của góc đó
+                pushPt(cx+R*ca, cy+R*sa, ca, sa)
             end
         end
 
-        -- Chiều kim đồng hồ: TL arc → top → TR arc → right → BR arc → bottom → BL arc → left
-        arc (R,   R,   PI,     PI*1.5)
-        line(R,   0,   W-R,   0     )
-        arc (W-R, R,   PI*1.5, PI*2 )
-        line(W,   R,   W,     H-R   )
-        arc (W-R, H-R, 0,     PI*0.5)
-        line(W-R, H,   R,     H     )
-        arc (R,   H-R, PI*0.5, PI   )
-        line(0,   H-R, 0,     R     )
+        arc (R,   R,   PI,      PI*1.5)   -- TL
+        line(R,   0,   W-R, 0,  0,  -1)  -- top    normal = lên
+        arc (W-R, R,   PI*1.5,  PI*2 )   -- TR
+        line(W,   R,   W,  H-R, 1,   0)  -- right  normal = phải
+        arc (W-R, H-R, 0,       PI*0.5)  -- BR
+        line(W-R, H,   R,   H,  0,   1)  -- bottom normal = xuống
+        arc (R,   H-R, PI*0.5,  PI   )   -- BL
+        line(0,   H-R, 0,   R, -1,   0)  -- left   normal = trái
         return path
     end
 
-    local function SpawnRunner(parent, path, headColor, tailColor, speed, reverse, phaseRatio)
-        -- Thanh gồm NDOTS dot, GAP=1px/dot → gần như liên tục
-        -- Đầu sáng màu headColor, đuôi fade sang tailColor rồi trong suốt
-        local NDOTS    = 72     -- dài hơn → thanh mượt rõ hơn
-        local GAP      = 1.4    -- px giữa 2 dot
-        local THICK    = 3      -- px kích thước dot
+    -- Pre-compute bảng alpha cho NDOTS dot
+    local NDOTS   = 80
+    local GAP     = 1.2   -- px/dot
+    local OFFSET  = 1.5   -- px: đẩy dot ra ngoài theo normal → nằm đúng trên viền
+    local WHITE   = Color3.new(1,1,1)
+
+    local alphaLUT = {}
+    for i=1,NDOTS do
+        local t = (i-1)/(NDOTS-1)
+        -- Bell: sáng nhất ở giữa thanh, mờ 2 đầu
+        -- Dùng gaussian-like: exp(-k*(t-c)^2)
+        local center = 0.25   -- điểm sáng nhất (gần đầu hơn)
+        local k      = 8
+        alphaLUT[i]  = math.exp(-k*(t-center)^2)
+    end
+
+    local function SpawnRunner(parent, path, speed, reverse, phaseRatio)
         local totalPts = #path
 
+        -- Tạo dots, tất cả màu trắng
         local dots = {}
         for i = 1, NDOTS do
             local d = Instance.new("Frame", parent)
-            d.Size              = UDim2.new(0, THICK, 0, THICK)
+            d.Size              = UDim2.new(0, 3, 0, 3)
             d.AnchorPoint       = Vector2.new(0.5, 0.5)
-            d.BackgroundColor3  = headColor
+            d.BackgroundColor3  = WHITE
             d.BackgroundTransparency = 1
             d.BorderSizePixel   = 0
-            d.ZIndex            = 9
-            -- Bo 1px → hình gần vuông, không tròn hoàn toàn
+            d.ZIndex            = 10
             Instance.new("UICorner", d).CornerRadius = UDim.new(0, 1)
             dots[i] = d
         end
 
         coroutine.wrap(function()
-            -- Phase offset: bắt đầu ở vị trí khác nhau trên path
             local headPos = phaseRatio * totalPts
             local last    = tick()
             while true do
                 RunService.Heartbeat:Wait()
-                local now = tick()
-                local dt  = now - last; last = now
+                local now = tick(); local dt = now-last; last = now
 
                 if reverse then
-                    headPos = headPos - speed * dt
+                    headPos = headPos - speed*dt
                     if headPos < 0 then headPos = headPos + totalPts end
                 else
-                    headPos = (headPos + speed * dt) % totalPts
+                    headPos = (headPos + speed*dt) % totalPts
                 end
 
                 for i = 1, NDOTS do
-                    -- Dot i nằm phía sau đầu i*GAP điểm
-                    local raw = headPos - i * GAP
+                    local raw = headPos - i*GAP
                     local idx = math.floor(raw) % totalPts
                     if idx <= 0 then idx = idx + totalPts end
-                    local pt  = path[idx]
+                    local pt = path[idx]
                     if pt then
-                        -- t: 0 = đầu (sáng), 1 = đuôi (mờ)
-                        local t     = (i - 1) / (NDOTS - 1)
-                        -- Easing: power 2 → đuôi tắt nhanh, đầu sáng rõ
-                        local alpha = (1 - t) ^ 2.2
-                        -- Màu lerp từ head → tail
-                        local col   = headColor:Lerp(tailColor, t ^ 0.7)
-                        dots[i].BackgroundColor3       = col
-                        dots[i].BackgroundTransparency = 1 - alpha * 0.96
-                        dots[i].Position = UDim2.new(0, pt[1], 0, pt[2])
+                        -- Đẩy dot ra ngoài theo normal OFFSET px → nằm đúng trên viền
+                        local px = pt[1] + pt[3] * OFFSET
+                        local py = pt[2] + pt[4] * OFFSET
+                        dots[i].BackgroundTransparency = 1 - alphaLUT[i] * 0.95
+                        dots[i].Position = UDim2.new(0, px, 0, py)
                     end
                 end
             end
@@ -425,21 +435,11 @@ function Library:CreateWindow()
     task.defer(function()
         task.wait(0.6)
         local path = BuildBorderPath(FRAME_W, FRAME_H, 15)
-        -- Hồng chạy thuận
-        SpawnRunner(main, path,
-            Color3.fromRGB(255,160,200),
-            Color3.fromRGB(255,100,160),
-            100, false, 0)
-        -- Tím chạy ngược, lệch nửa vòng
-        SpawnRunner(main, path,
-            Color3.fromRGB(210,170,255),
-            Color3.fromRGB(170,120,255),
-            88,  true,  0.5)
-        -- Trắng nhỏ chạy thuận, lệch 1/4 vòng
-        SpawnRunner(main, path,
-            Color3.fromRGB(255,255,255),
-            Color3.fromRGB(255,210,230),
-            135, false, 0.25)
+        local SPEED = 110  -- cùng tốc độ
+        -- Runner 1: chạy thuận chiều kim đồng hồ
+        SpawnRunner(main, path, SPEED, false, 0)
+        -- Runner 2: chạy NGƯỢC, lệch nửa vòng → đối xứng
+        SpawnRunner(main, path, SPEED, true,  0.5)
     end)
 
     openBtn.MouseButton1Click:Connect(function() PlayClickSound(); ToggleUI() end)
