@@ -324,59 +324,80 @@ function Library:CreateWindow()
         end
     end)()
 
-    -- ══ BORDER RUNNER ══
-    -- 1 Frame viền, UIStroke + UIGradient Color xoay
-    -- Gradient: 2 vệt trắng ngắn đối xứng (trái/phải), nền đen = ẩn
-    do
+    -- ══ BORDER RUNNER dùng ý tưởng của user ══
+    -- Tạo 2 Frame viền clone y hệt main (trong suốt hoàn toàn)
+    -- Mỗi Frame có UIStroke với UIGradient chạy rotation liên tục
+    -- → ánh sáng quét quanh viền theo gradient xoay, 1 thuận 1 ngược
+
+    local function CreateGlowBorder(reverse, phaseOffset)
+        phaseOffset = phaseOffset or 0
         local border = Instance.new("Frame", screenGui)
-        border.Size               = UDim2.new(0, FRAME_W - 8, 0, FRAME_H - 8)
-        border.AnchorPoint        = Vector2.new(0.5, 0.5)
-        border.Position           = main.Position
-        border.BackgroundTransparency = 1
-        border.BorderSizePixel    = 0
-        border.ZIndex             = 2
-        border.Active             = false
+        border.Size                  = UDim2.new(0, FRAME_W, 0, FRAME_H)
+        border.Position              = main.Position
+        border.AnchorPoint           = Vector2.new(0.5, 0.5)
+        border.BackgroundTransparency = 1        -- trong suốt hoàn toàn
+        border.ZIndex                = 2
+        border.Active                = false
         Instance.new("UICorner", border).CornerRadius = UDim.new(0, 15)
 
         local stroke = Instance.new("UIStroke", border)
-        stroke.Thickness       = 2
-        stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        stroke.Thickness             = 2
+        stroke.ApplyStrokeMode       = Enum.ApplyStrokeMode.Border
 
-        -- 2 vệt trắng ngắn đối xứng 180°
-        -- Đen = ẩn, Trắng = vệt sáng
+        -- Gradient: trắng sáng → trong suốt → trắng sáng
+        -- Xoay gradient liên tục → ánh sáng chạy quanh viền
         local grad = Instance.new("UIGradient", stroke)
         grad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0,    Color3.new(0,0,0)),
-            ColorSequenceKeypoint.new(0.40, Color3.new(0,0,0)),
-            ColorSequenceKeypoint.new(0.46, Color3.new(1,1,1)),
-            ColorSequenceKeypoint.new(0.54, Color3.new(1,1,1)),
-            ColorSequenceKeypoint.new(0.60, Color3.new(0,0,0)),
-            ColorSequenceKeypoint.new(0.90, Color3.new(0,0,0)),
-            ColorSequenceKeypoint.new(0.96, Color3.new(1,1,1)),
-            ColorSequenceKeypoint.new(1,    Color3.new(1,1,1)),
+            ColorSequenceKeypoint.new(0,   Color3.new(1,1,1)),
+            ColorSequenceKeypoint.new(0.5, Color3.new(1,1,1)),
+            ColorSequenceKeypoint.new(1,   Color3.new(1,1,1)),
         })
-        grad.Rotation = 0
+        grad.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0,    1   ),
+            NumberSequenceKeypoint.new(0.08, 0.95),
+            NumberSequenceKeypoint.new(0.18, 0   ),
+            NumberSequenceKeypoint.new(0.32, 0.95),
+            NumberSequenceKeypoint.new(0.5,  1   ),
+            NumberSequenceKeypoint.new(0.68, 0.95),
+            NumberSequenceKeypoint.new(0.82, 0   ),
+            NumberSequenceKeypoint.new(0.92, 0.95),
+            NumberSequenceKeypoint.new(1,    1   ),
+        })
 
-        -- Sync position + visible với main
+        -- Đồng bộ position với main khi user drag
         coroutine.wrap(function()
             while true do
                 RunService.Heartbeat:Wait()
-                border.Position = main.Position
-                border.Visible  = main.Visible
+                if main.Visible then
+                    border.Position = main.Position
+                    border.Visible  = true
+                else
+                    border.Visible  = false
+                end
             end
         end)()
 
-        -- Xoay cùng chiều kim đồng hồ, 42°/s
+        -- Xoay gradient liên tục — cùng chiều kim đồng hồ, cùng tốc độ
         coroutine.wrap(function()
-            local rot = 0; local last = tick()
+            local rot = phaseOffset   -- lệch phase để 1 trái 1 phải
+            local spd = 38            -- °/s, cùng tốc độ, cùng chiều
+            local last = tick()
             while true do
                 RunService.Heartbeat:Wait()
                 local now = tick(); local dt = now-last; last = now
-                rot = (rot + 42*dt) % 360
+                rot = (rot + spd*dt) % 360
                 grad.Rotation = rot
             end
         end)()
+
+        return border
     end
+
+    task.defer(function()
+        task.wait(0.1)
+        CreateGlowBorder(false, 0)     -- vệt bên trái  (phase 0°)
+        CreateGlowBorder(false, 180)   -- vệt bên phải  (lệch 180°)
+    end)
 
     openBtn.MouseButton1Click:Connect(function() PlayClickSound(); ToggleUI() end)
     UserInputService.InputBegan:Connect(function(inp,gpe)
