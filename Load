@@ -111,6 +111,8 @@ local function CleanupOldUI()
     local gui = GetGuiParent()
     local old = gui:FindFirstChild("TOKAIHUB")
     if old then old:Destroy() end
+    local oldOverlay = gui:FindFirstChild("TOKAIHUB_OVERLAY")
+    if oldOverlay then oldOverlay:Destroy() end
 end
 CleanupOldUI()
 
@@ -176,6 +178,7 @@ local Library = {}
 function Library:CreateWindow()
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "TOKAIHUB"
+    screenGui.DisplayOrder = 10   -- UI chính nằm TRÊN overlay
     screenGui.Parent = GetGuiParent()
     screenGui.ResetOnSpawn = false
     screenGui.IgnoreGuiInset = true
@@ -246,14 +249,18 @@ function Library:CreateWindow()
     local lockBtn  = MakeToolBtn("🔓", Color3.fromRGB(80,200,80))
     local keyBtn   = MakeToolBtn("⌨",  DarkPink)
 
-    -- ── Overlay mờ phía sau window (chỉ visual, không block click) ──
-    local overlay = Instance.new("Frame", screenGui)
+    -- ── Overlay mờ: ScreenGui riêng với DisplayOrder THẤP hơn screenGui ──
+    local overlayGui = Instance.new("ScreenGui", GetGuiParent())
+    overlayGui.Name = "TOKAIHUB_OVERLAY"
+    overlayGui.ResetOnSpawn = false
+    overlayGui.IgnoreGuiInset = true
+    overlayGui.DisplayOrder = -1   -- nằm dưới screenGui (DisplayOrder mặc định = 0)
+    local overlay = Instance.new("Frame", overlayGui)
     overlay.Size = UDim2.new(1,0,1,0); overlay.Position = UDim2.new(0,0,0,0)
     overlay.BackgroundColor3 = Color3.fromRGB(10,5,10)
     overlay.BackgroundTransparency = 1
-    overlay.ZIndex = 1          -- nằm dưới UI (main ZIndex mặc định cao hơn)
     overlay.Visible = false
-    overlay.Active = false      -- KHÔNG bắt input, click xuyên qua được
+    overlay.Active = false  -- không bắt input
 
     local isTweening = false
     local function ToggleUI()
@@ -626,155 +633,183 @@ function Library:CreateWindow()
     local function MakeDropdown(parent, labelText, yPos, options, savedKey, onCallback)
         local selected = S[savedKey] or options[1]
         local isOpen   = false
-        local ITEM_H   = 20
-        local HEAD_H   = 24
+        local ITEM_H   = 22
+        local HEAD_H   = 26
 
-        -- ── Header row ──
+        -- ── Header ──
         local head = Instance.new("Frame", parent)
         head.Size = UDim2.new(1,-4,0,HEAD_H)
         head.Position = UDim2.new(0,2,0,yPos)
         head.BackgroundColor3 = Color3.fromRGB(255,255,255)
-        head.BackgroundTransparency = 0.45
+        head.BackgroundTransparency = 0.4
         head.ClipsDescendants = false
         Instance.new("UICorner", head).CornerRadius = UDim.new(0,7)
         local headStroke = Instance.new("UIStroke", head)
         headStroke.Color = DarkPink; headStroke.Thickness = 1.2
 
+        -- Label trái
         local lbl = Instance.new("TextLabel", head)
-        lbl.Size = UDim2.new(0.5,0,1,0); lbl.Position = UDim2.new(0,8,0,0)
+        lbl.Size = UDim2.new(0,0,1,0); lbl.AutomaticSize = Enum.AutomaticSize.X
+        lbl.Position = UDim2.new(0,8,0,0)
         lbl.Text = labelText; lbl.Font = Enum.Font.GothamBold
         lbl.TextColor3 = TextColor; lbl.TextSize = 9
         lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.BackgroundTransparency = 1
 
-        local valLbl = Instance.new("TextLabel", head)
-        valLbl.Size = UDim2.new(0.42,0,1,0); valLbl.Position = UDim2.new(0.5,0,0,0)
+        -- Pill giá trị đang chọn (bên phải)
+        local pillBg = Instance.new("Frame", head)
+        pillBg.Size = UDim2.new(0,0,0,18); pillBg.AutomaticSize = Enum.AutomaticSize.X
+        pillBg.Position = UDim2.new(1,-24,0.5,-9)   -- sẽ update sau khi có valLbl
+        pillBg.BackgroundColor3 = Color3.fromRGB(255,210,225)
+        pillBg.BackgroundTransparency = 0.2
+        Instance.new("UICorner", pillBg).CornerRadius = UDim.new(1,0)
+        local pillPad = Instance.new("UIPadding", pillBg)
+        pillPad.PaddingLeft = UDim.new(0,6); pillPad.PaddingRight = UDim.new(0,6)
+
+        local valLbl = Instance.new("TextLabel", pillBg)
+        valLbl.Size = UDim2.new(0,0,1,0); valLbl.AutomaticSize = Enum.AutomaticSize.X
         valLbl.Text = selected; valLbl.Font = Enum.Font.GothamBold
-        valLbl.TextColor3 = DarkPink; valLbl.TextSize = 9
-        valLbl.TextXAlignment = Enum.TextXAlignment.Right; valLbl.BackgroundTransparency = 1
+        valLbl.TextColor3 = DarkPink; valLbl.TextSize = 8
+        valLbl.BackgroundTransparency = 1
 
+        -- Reposition pill dựa vào width thực
+        task.defer(function()
+            local pw = pillBg.AbsoluteSize.X
+            pillBg.Position = UDim2.new(1, -(pw + 22), 0.5, -9)
+        end)
+
+        -- Arrow "V"
         local arrow = Instance.new("TextLabel", head)
-        arrow.Size = UDim2.new(0,18,1,0); arrow.Position = UDim2.new(1,-20,0,0)
+        arrow.Size = UDim2.new(0,16,1,0); arrow.Position = UDim2.new(1,-18,0,0)
         arrow.Text = "V"; arrow.Font = Enum.Font.GothamBold
-        arrow.TextColor3 = DarkPink; arrow.TextSize = 9; arrow.BackgroundTransparency = 1
+        arrow.TextColor3 = DarkPink; arrow.TextSize = 9
+        arrow.BackgroundTransparency = 1
+        arrow.AnchorPoint = Vector2.new(0,0)
 
-        -- ── Dropdown list (render ở screenGui để thoát ClipsDescendants) ──
+        -- ── List (parent = screenGui, ZIndex cao, nằm TRONG screenGui chính) ──
         local listFrame = Instance.new("Frame", screenGui)
-        listFrame.Size = UDim2.new(0, 1, 0, 1)
-        listFrame.BackgroundColor3 = Color3.fromRGB(255,245,248)
-        listFrame.BackgroundTransparency = 0.02
+        listFrame.BackgroundColor3 = Color3.fromRGB(255,248,251)
+        listFrame.BackgroundTransparency = 0.0
         listFrame.Visible = false
-        listFrame.ZIndex = 50
+        listFrame.ZIndex = 20
         listFrame.ClipsDescendants = true
-        Instance.new("UICorner", listFrame).CornerRadius = UDim.new(0,7)
+        Instance.new("UICorner", listFrame).CornerRadius = UDim.new(0,8)
         local listStroke = Instance.new("UIStroke", listFrame)
-        listStroke.Color = DarkPink; listStroke.Thickness = 1.0
-
-        local function GetHeadAbsPos()
-            return head.AbsolutePosition, head.AbsoluteSize
-        end
+        listStroke.Color = DarkPink; listStroke.Thickness = 1.2; listStroke.Transparency = 0.3
 
         local function CloseList(instant)
             if not isOpen then return end
-            isOpen = false
-            activeDropdown = nil
+            isOpen = false; activeDropdown = nil
             TweenService:Create(arrow, TweenInfo.new(0.2,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Rotation=0}):Play()
             TweenService:Create(headStroke, TweenInfo.new(0.15), {Transparency=0}):Play()
             if instant then
                 listFrame.Visible = false
             else
-                TweenService:Create(listFrame, TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.In),
-                    {Size=UDim2.new(0, listFrame.AbsoluteSize.X, 0, 0), BackgroundTransparency=0.5}):Play()
-                task.delay(0.22, function() listFrame.Visible=false end)
+                local w = listFrame.AbsoluteSize.X
+                TweenService:Create(listFrame, TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.In),
+                    {Size=UDim2.new(0,w,0,0)}):Play()
+                task.delay(0.2, function() listFrame.Visible = false end)
             end
         end
 
         local function OpenList()
-            -- Đóng dropdown khác nếu đang mở
-            if activeDropdown and activeDropdown ~= CloseList then
-                activeDropdown(true)
-            end
+            if activeDropdown and activeDropdown ~= CloseList then activeDropdown(true) end
             activeDropdown = CloseList
             isOpen = true
 
-            local absPos, absSize = GetHeadAbsPos()
-            local totalH = #options * ITEM_H + 4
+            -- Lấy vị trí tuyệt đối của head SAU khi render xong
+            local absPos = head.AbsolutePosition
+            local absSize = head.AbsoluteSize
+            local totalH = #options * ITEM_H + 6
             local listW  = absSize.X
 
-            listFrame.Size = UDim2.new(0, listW, 0, 0)
-            listFrame.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 3)
-            listFrame.BackgroundTransparency = 0.05
-            listFrame.Visible = true
-
             -- Xóa items cũ
-            for _,c in pairs(listFrame:GetChildren()) do
-                if c:IsA("TextButton") or c:IsA("Frame") then c:Destroy() end
+            for _, c in pairs(listFrame:GetChildren()) do
+                if c:IsA("TextButton") then c:Destroy() end
             end
 
-            -- Tạo item cho từng option
+            -- Build items
             for i, opt in ipairs(options) do
                 local item = Instance.new("TextButton", listFrame)
-                item.Size = UDim2.new(1,0,0,ITEM_H)
-                item.Position = UDim2.new(0,0,0,(i-1)*ITEM_H+2)
-                item.BackgroundColor3 = (opt == selected)
-                    and Color3.fromRGB(255,210,220)
-                    or  Color3.fromRGB(255,245,248)
-                item.BackgroundTransparency = (opt == selected) and 0.1 or 1
-                item.Text = (opt == selected and "✓  " or "    ") .. opt
-                item.Font = Enum.Font.GothamBold
-                item.TextColor3 = (opt == selected) and DarkPink or TextColor
-                item.TextSize = 9
+                item.Size      = UDim2.new(1,0,0,ITEM_H)
+                item.Position  = UDim2.new(0,0,0,(i-1)*ITEM_H+3)
+                item.BackgroundColor3 = opt == selected
+                    and Color3.fromRGB(255,215,228) or Color3.fromRGB(255,248,251)
+                item.BackgroundTransparency = opt == selected and 0.0 or 1
+                item.Font      = Enum.Font.GothamBold
+                item.TextColor3 = opt == selected and DarkPink or TextColor
+                item.TextSize  = 9
                 item.TextXAlignment = Enum.TextXAlignment.Left
-                item.ZIndex = 51
-                local pad = Instance.new("UIPadding", item); pad.PaddingLeft = UDim.new(0,8)
+                item.ZIndex    = 21
+                item.Text      = ""
+                local pad = Instance.new("UIPadding", item)
+                pad.PaddingLeft = UDim.new(0,10)
 
-                -- Hover item
+                -- checkmark + text
+                local chk = Instance.new("TextLabel", item)
+                chk.Size = UDim2.new(0,12,1,0); chk.Position = UDim2.new(0,0,0,0)
+                chk.Text = opt == selected and "✓" or ""
+                chk.Font = Enum.Font.GothamBold; chk.TextSize = 8
+                chk.TextColor3 = DarkPink; chk.BackgroundTransparency = 1; chk.ZIndex = 22
+
+                local txt = Instance.new("TextLabel", item)
+                txt.Size = UDim2.new(1,-14,1,0); txt.Position = UDim2.new(0,14,0,0)
+                txt.Text = opt; txt.Font = Enum.Font.GothamBold; txt.TextSize = 9
+                txt.TextColor3 = opt == selected and DarkPink or TextColor
+                txt.TextXAlignment = Enum.TextXAlignment.Left
+                txt.BackgroundTransparency = 1; txt.ZIndex = 22
+
                 item.MouseEnter:Connect(function()
                     if opt ~= selected then
-                        TweenService:Create(item, TweenInfo.new(0.12), {BackgroundTransparency=0.5, BackgroundColor3=Color3.fromRGB(255,225,232)}):Play()
-                        item.TextColor3 = DarkPink
+                        TweenService:Create(item, TweenInfo.new(0.1), {BackgroundTransparency=0.5, BackgroundColor3=Color3.fromRGB(255,228,238)}):Play()
+                        txt.TextColor3 = DarkPink
                     end
                 end)
                 item.MouseLeave:Connect(function()
                     if opt ~= selected then
-                        TweenService:Create(item, TweenInfo.new(0.12), {BackgroundTransparency=1, BackgroundColor3=Color3.fromRGB(255,240,244)}):Play()
-                        item.TextColor3 = TextColor
+                        TweenService:Create(item, TweenInfo.new(0.1), {BackgroundTransparency=1, BackgroundColor3=Color3.fromRGB(255,248,251)}):Play()
+                        txt.TextColor3 = TextColor
                     end
                 end)
-
                 item.MouseButton1Click:Connect(function()
                     PlayClickSound()
-                    selected = opt
-                    S[savedKey] = selected; Save()
+                    selected = opt; S[savedKey] = selected; Save()
                     valLbl.Text = selected
-
-                    -- Flash chọn
-                    TweenService:Create(item, TweenInfo.new(0.08), {BackgroundColor3=Color3.fromRGB(200,255,210), BackgroundTransparency=0.1}):Play()
-                    task.delay(0.08, function() CloseList(false) end)
+                    -- Reposition pill
+                    task.defer(function()
+                        local pw = pillBg.AbsoluteSize.X
+                        pillBg.Position = UDim2.new(1, -(pw+22), 0.5, -9)
+                    end)
+                    TweenService:Create(item, TweenInfo.new(0.07), {BackgroundColor3=Color3.fromRGB(200,255,215)}):Play()
+                    task.delay(0.07, function() CloseList(false) end)
                     if onCallback then onCallback(selected) end
                     ShowToast("Đã chọn: "..selected, "✅")
                 end)
             end
 
-            -- Animate mở
+            -- Đặt vị trí: ngay dưới head + 4px, không che head
+            listFrame.Size = UDim2.new(0, listW, 0, 0)
+            listFrame.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 4)
+            listFrame.Visible = true
+
+            -- Animate
             TweenService:Create(arrow, TweenInfo.new(0.22,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Rotation=180}):Play()
             TweenService:Create(headStroke, TweenInfo.new(0.15), {Transparency=0.3}):Play()
             TweenService:Create(listFrame, TweenInfo.new(0.25,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
                 {Size=UDim2.new(0, listW, 0, totalH)}):Play()
         end
 
-        -- Toggle khi nhấn header
+        -- Toggle button
         local headBtn = Instance.new("TextButton", head)
-        headBtn.Size = UDim2.new(1,0,1,0); headBtn.BackgroundTransparency = 1; headBtn.Text = ""
-        headBtn.ZIndex = 10
+        headBtn.Size = UDim2.new(1,0,1,0); headBtn.BackgroundTransparency = 1; headBtn.Text = ""; headBtn.ZIndex = 10
         headBtn.MouseButton1Click:Connect(function()
             PlayClickSound()
             if isOpen then CloseList(false) else OpenList() end
         end)
         headBtn.MouseEnter:Connect(function()
-            TweenService:Create(head, TweenInfo.new(0.15), {BackgroundTransparency=0.3}):Play()
+            TweenService:Create(head, TweenInfo.new(0.15), {BackgroundTransparency=0.25}):Play()
         end)
         headBtn.MouseLeave:Connect(function()
-            TweenService:Create(head, TweenInfo.new(0.15), {BackgroundTransparency=0.45}):Play()
+            TweenService:Create(head, TweenInfo.new(0.15), {BackgroundTransparency=0.4}):Play()
         end)
 
         return head
