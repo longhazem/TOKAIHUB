@@ -324,91 +324,59 @@ function Library:CreateWindow()
         end
     end)()
 
-    -- ══ BORDER RUNNER dùng ý tưởng của user ══
-    -- Tạo 2 Frame viền clone y hệt main (trong suốt hoàn toàn)
-    -- Mỗi Frame có UIStroke với UIGradient chạy rotation liên tục
-    -- → ánh sáng quét quanh viền theo gradient xoay, 1 thuận 1 ngược
-
     -- ══ BORDER RUNNER ══
-    -- Dùng Frame viền mỏng (outline) + UIGradient trên Background (không phải UIStroke)
-    -- UIGradient trên Frame Background hoạt động đúng với Transparency
-    -- 2 vệt trắng cùng chiều kim đồng hồ, lệch 180°
+    -- 1 Frame viền, UIStroke + UIGradient Color xoay
+    -- Gradient: 2 vệt trắng ngắn đối xứng (trái/phải), nền đen = ẩn
+    do
+        local border = Instance.new("Frame", screenGui)
+        border.Size               = UDim2.new(0, FRAME_W - 8, 0, FRAME_H - 8)
+        border.AnchorPoint        = Vector2.new(0.5, 0.5)
+        border.Position           = main.Position
+        border.BackgroundTransparency = 1
+        border.BorderSizePixel    = 0
+        border.ZIndex             = 2
+        border.Active             = false
+        Instance.new("UICorner", border).CornerRadius = UDim.new(0, 15)
 
-    local function CreateGlowBorder(phaseOffset)
-        -- Outer frame: viền ngoài, background trắng mỏng
-        -- Dùng 2 frame lồng nhau: outer trắng - inner trong suốt = viền mỏng
-        local BORDER = 2   -- px độ dày viền
+        local stroke = Instance.new("UIStroke", border)
+        stroke.Thickness       = 2
+        stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
-        local outer = Instance.new("Frame", screenGui)
-        outer.Size              = UDim2.new(0, FRAME_W + BORDER*2, 0, FRAME_H + BORDER*2)
-        outer.AnchorPoint       = Vector2.new(0.5, 0.5)
-        outer.Position          = main.Position
-        outer.BackgroundColor3  = Color3.new(1, 1, 1)
-        outer.BackgroundTransparency = 0
-        outer.BorderSizePixel   = 0
-        outer.ZIndex            = 2
-        outer.Active            = false
-        Instance.new("UICorner", outer).CornerRadius = UDim.new(0, 16)
-
-        -- UIGradient trên outer: tạo vệt sáng chạy quanh
-        -- Transparency: 2 vùng sáng (0) xen kẽ tối (1) → 2 vệt khi xoay
-        local grad = Instance.new("UIGradient", outer)
-        grad.Color = ColorSequence.new(Color3.new(1,1,1))
-        grad.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0,    1   ),
-            NumberSequenceKeypoint.new(0.12, 1   ),
-            NumberSequenceKeypoint.new(0.20, 0.05),
-            NumberSequenceKeypoint.new(0.28, 1   ),
-            NumberSequenceKeypoint.new(0.62, 1   ),
-            NumberSequenceKeypoint.new(0.70, 0.05),
-            NumberSequenceKeypoint.new(0.78, 1   ),
-            NumberSequenceKeypoint.new(1,    1   ),
+        -- 2 vệt trắng ngắn đối xứng 180°
+        -- Đen = ẩn, Trắng = vệt sáng
+        local grad = Instance.new("UIGradient", stroke)
+        grad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0,    Color3.new(0,0,0)),
+            ColorSequenceKeypoint.new(0.40, Color3.new(0,0,0)),
+            ColorSequenceKeypoint.new(0.46, Color3.new(1,1,1)),
+            ColorSequenceKeypoint.new(0.54, Color3.new(1,1,1)),
+            ColorSequenceKeypoint.new(0.60, Color3.new(0,0,0)),
+            ColorSequenceKeypoint.new(0.90, Color3.new(0,0,0)),
+            ColorSequenceKeypoint.new(0.96, Color3.new(1,1,1)),
+            ColorSequenceKeypoint.new(1,    Color3.new(1,1,1)),
         })
-        grad.Rotation = phaseOffset
+        grad.Rotation = 0
 
-        -- Inner frame che phủ bên trong → chỉ để lộ viền mỏng
-        local inner = Instance.new("Frame", outer)
-        inner.Size              = UDim2.new(1, -BORDER*2, 1, -BORDER*2)
-        inner.AnchorPoint       = Vector2.new(0.5, 0.5)
-        inner.Position          = UDim2.new(0.5, 0, 0.5, 0)
-        inner.BackgroundColor3  = Color3.fromRGB(255, 182, 193)  -- màu giống main
-        inner.BackgroundTransparency = 1   -- trong suốt để thấy main bên dưới
-        inner.BorderSizePixel   = 0
-        inner.ZIndex            = 3
-        Instance.new("UICorner", inner).CornerRadius = UDim.new(0, 15)
-
-        -- Đồng bộ position + visibility với main
+        -- Sync position + visible với main
         coroutine.wrap(function()
             while true do
                 RunService.Heartbeat:Wait()
-                if main.Visible then
-                    outer.Position = main.Position
-                    outer.Visible  = true
-                else
-                    outer.Visible  = false
-                end
+                border.Position = main.Position
+                border.Visible  = main.Visible
             end
         end)()
 
-        -- Xoay gradient liên tục, cùng chiều, cùng tốc độ
+        -- Xoay cùng chiều kim đồng hồ, 42°/s
         coroutine.wrap(function()
-            local rot  = phaseOffset
-            local spd  = 45   -- °/s
-            local last = tick()
+            local rot = 0; local last = tick()
             while true do
                 RunService.Heartbeat:Wait()
                 local now = tick(); local dt = now-last; last = now
-                rot = (rot + spd * dt) % 360
+                rot = (rot + 42*dt) % 360
                 grad.Rotation = rot
             end
         end)()
     end
-
-    task.defer(function()
-        task.wait(0.1)
-        CreateGlowBorder(0)    -- vệt 1: bắt đầu 0°
-        CreateGlowBorder(180)  -- vệt 2: bắt đầu 180° (đối diện)
-    end)
 
     openBtn.MouseButton1Click:Connect(function() PlayClickSound(); ToggleUI() end)
     UserInputService.InputBegan:Connect(function(inp,gpe)
