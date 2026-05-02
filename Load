@@ -314,7 +314,7 @@ function Library:CreateWindow()
         end)
     end)
 
-    -- ══ RAINBOW STROKE ══
+    -- ══ RAINBOW STROKE (main border color cycle) ══
     coroutine.wrap(function()
         local cols = {Color3.fromRGB(255,255,255),Color3.fromRGB(255,192,203),Color3.fromRGB(230,190,255)}
         while task.wait() do
@@ -324,122 +324,82 @@ function Library:CreateWindow()
         end
     end)()
 
-    -- ══ BORDER RUNNER ══
-    -- Path build sẵn với normal vector để dot nằm ĐÚNG TRÊN VIỀN
-    -- Pre-compute toàn bộ alpha/color lookup → loop chỉ set Position + Transparency
-    local function BuildBorderPath(W, H, R)
-        local PI   = math.pi
-        local path = {}
-        -- density cao: 4 điểm/px → góc cong siêu mịn
-        local D    = 4
+    -- ══ BORDER RUNNER dùng ý tưởng của user ══
+    -- Tạo 2 Frame viền clone y hệt main (trong suốt hoàn toàn)
+    -- Mỗi Frame có UIStroke với UIGradient chạy rotation liên tục
+    -- → ánh sáng quét quanh viền theo gradient xoay, 1 thuận 1 ngược
 
-        -- Mỗi point: {x, y, nx, ny}  (nx,ny = outward normal, magnitude=1)
-        local function pushPt(x, y, nx, ny)
-            table.insert(path, {x, y, nx, ny})
-        end
+    local function CreateGlowBorder(reverse)
+        local border = Instance.new("Frame", screenGui)
+        border.Size                  = UDim2.new(0, FRAME_W, 0, FRAME_H)
+        border.Position              = main.Position
+        border.AnchorPoint           = Vector2.new(0.5, 0.5)
+        border.BackgroundTransparency = 1        -- trong suốt hoàn toàn
+        border.ZIndex                = 2
+        border.Active                = false
+        Instance.new("UICorner", border).CornerRadius = UDim.new(0, 15)
 
-        local function line(x1,y1, x2,y2, nx,ny)
-            local dx,dy = x2-x1, y2-y1
-            local len   = math.sqrt(dx*dx+dy*dy)
-            local steps = math.max(1, math.floor(len*D))
-            for i=0,steps do
-                local t=i/steps
-                pushPt(x1+dx*t, y1+dy*t, nx, ny)
-            end
-        end
-        local function arc(cx,cy, a0,a1)
-            local steps = math.max(4, math.floor(math.abs(a1-a0)*R*D))
-            for i=0,steps do
-                local a  = a0+(a1-a0)*(i/steps)
-                local ca = math.cos(a); local sa = math.sin(a)
-                -- normal hướng ra ngoài = (cos,sin) của góc đó
-                pushPt(cx+R*ca, cy+R*sa, ca, sa)
-            end
-        end
+        local stroke = Instance.new("UIStroke", border)
+        stroke.Thickness             = 2
+        stroke.ApplyStrokeMode       = Enum.ApplyStrokeMode.Border
 
-        arc (R,   R,   PI,      PI*1.5)   -- TL
-        line(R,   0,   W-R, 0,  0,  -1)  -- top    normal = lên
-        arc (W-R, R,   PI*1.5,  PI*2 )   -- TR
-        line(W,   R,   W,  H-R, 1,   0)  -- right  normal = phải
-        arc (W-R, H-R, 0,       PI*0.5)  -- BR
-        line(W-R, H,   R,   H,  0,   1)  -- bottom normal = xuống
-        arc (R,   H-R, PI*0.5,  PI   )   -- BL
-        line(0,   H-R, 0,   R, -1,   0)  -- left   normal = trái
-        return path
-    end
+        -- Gradient: trắng sáng → trong suốt → trắng sáng
+        -- Xoay gradient liên tục → ánh sáng chạy quanh viền
+        local grad = Instance.new("UIGradient", stroke)
+        grad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0,    Color3.new(1,1,1)),
+            ColorSequenceKeypoint.new(0.18, Color3.new(1,1,1)),
+            ColorSequenceKeypoint.new(0.22, Color3.new(1,0.85,0.92)),
+            ColorSequenceKeypoint.new(0.5,  Color3.new(1,1,1)),
+            ColorSequenceKeypoint.new(0.78, Color3.new(1,0.85,0.92)),
+            ColorSequenceKeypoint.new(0.82, Color3.new(1,1,1)),
+            ColorSequenceKeypoint.new(1,    Color3.new(1,1,1)),
+        })
+        grad.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0,    1   ),
+            NumberSequenceKeypoint.new(0.08, 0.95),
+            NumberSequenceKeypoint.new(0.18, 0   ),
+            NumberSequenceKeypoint.new(0.32, 0.95),
+            NumberSequenceKeypoint.new(0.5,  1   ),
+            NumberSequenceKeypoint.new(0.68, 0.95),
+            NumberSequenceKeypoint.new(0.82, 0   ),
+            NumberSequenceKeypoint.new(0.92, 0.95),
+            NumberSequenceKeypoint.new(1,    1   ),
+        })
 
-    -- Pre-compute bảng alpha cho NDOTS dot
-    local NDOTS   = 80
-    local GAP     = 1.2   -- px/dot
-    local OFFSET  = 1.5   -- px: đẩy dot ra ngoài theo normal → nằm đúng trên viền
-    local WHITE   = Color3.new(1,1,1)
-
-    local alphaLUT = {}
-    for i=1,NDOTS do
-        local t = (i-1)/(NDOTS-1)
-        -- Bell: sáng nhất ở giữa thanh, mờ 2 đầu
-        -- Dùng gaussian-like: exp(-k*(t-c)^2)
-        local center = 0.25   -- điểm sáng nhất (gần đầu hơn)
-        local k      = 8
-        alphaLUT[i]  = math.exp(-k*(t-center)^2)
-    end
-
-    local function SpawnRunner(parent, path, speed, reverse, phaseRatio)
-        local totalPts = #path
-
-        -- Tạo dots, tất cả màu trắng
-        local dots = {}
-        for i = 1, NDOTS do
-            local d = Instance.new("Frame", parent)
-            d.Size              = UDim2.new(0, 3, 0, 3)
-            d.AnchorPoint       = Vector2.new(0.5, 0.5)
-            d.BackgroundColor3  = WHITE
-            d.BackgroundTransparency = 1
-            d.BorderSizePixel   = 0
-            d.ZIndex            = 10
-            Instance.new("UICorner", d).CornerRadius = UDim.new(0, 1)
-            dots[i] = d
-        end
-
+        -- Đồng bộ position với main khi user drag
         coroutine.wrap(function()
-            local headPos = phaseRatio * totalPts
-            local last    = tick()
             while true do
                 RunService.Heartbeat:Wait()
-                local now = tick(); local dt = now-last; last = now
-
-                if reverse then
-                    headPos = headPos - speed*dt
-                    if headPos < 0 then headPos = headPos + totalPts end
+                if main.Visible then
+                    border.Position = main.Position
+                    border.Visible  = true
                 else
-                    headPos = (headPos + speed*dt) % totalPts
-                end
-
-                for i = 1, NDOTS do
-                    local raw = headPos - i*GAP
-                    local idx = math.floor(raw) % totalPts
-                    if idx <= 0 then idx = idx + totalPts end
-                    local pt = path[idx]
-                    if pt then
-                        -- Đẩy dot ra ngoài theo normal OFFSET px → nằm đúng trên viền
-                        local px = pt[1] + pt[3] * OFFSET
-                        local py = pt[2] + pt[4] * OFFSET
-                        dots[i].BackgroundTransparency = 1 - alphaLUT[i] * 0.95
-                        dots[i].Position = UDim2.new(0, px, 0, py)
-                    end
+                    border.Visible  = false
                 end
             end
         end)()
+
+        -- Xoay gradient liên tục
+        coroutine.wrap(function()
+            local rot = reverse and 180 or 0
+            local spd = reverse and -38 or 38   -- °/s, cùng tốc độ tuyệt đối
+            local last = tick()
+            while true do
+                RunService.Heartbeat:Wait()
+                local now = tick(); local dt = now-last; last = now
+                rot = (rot + spd*dt) % 360
+                grad.Rotation = rot
+            end
+        end)()
+
+        return border
     end
 
     task.defer(function()
-        task.wait(0.6)
-        local path = BuildBorderPath(FRAME_W, FRAME_H, 15)
-        local SPEED = 110  -- cùng tốc độ
-        -- Runner 1: chạy thuận chiều kim đồng hồ
-        SpawnRunner(main, path, SPEED, false, 0)
-        -- Runner 2: chạy NGƯỢC, lệch nửa vòng → đối xứng
-        SpawnRunner(main, path, SPEED, true,  0.5)
+        task.wait(0.1)
+        CreateGlowBorder(false)   -- thuận chiều kim đồng hồ
+        CreateGlowBorder(true)    -- ngược chiều kim đồng hồ
     end)
 
     openBtn.MouseButton1Click:Connect(function() PlayClickSound(); ToggleUI() end)
