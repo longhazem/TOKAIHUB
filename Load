@@ -246,20 +246,21 @@ function Library:CreateWindow()
     local lockBtn  = MakeToolBtn("🔓", Color3.fromRGB(80,200,80))
     local keyBtn   = MakeToolBtn("⌨",  DarkPink)
 
-    -- ── Overlay mờ phía sau window ──
+    -- ── Overlay mờ phía sau window (chỉ visual, không block click) ──
     local overlay = Instance.new("Frame", screenGui)
     overlay.Size = UDim2.new(1,0,1,0); overlay.Position = UDim2.new(0,0,0,0)
-    overlay.BackgroundColor3 = Color3.fromRGB(20,10,15)
-    overlay.BackgroundTransparency = 1; overlay.ZIndex = 0; overlay.Visible = false
-    overlay.Active = false
+    overlay.BackgroundColor3 = Color3.fromRGB(10,5,10)
+    overlay.BackgroundTransparency = 1
+    overlay.ZIndex = 1          -- nằm dưới UI (main ZIndex mặc định cao hơn)
+    overlay.Visible = false
+    overlay.Active = false      -- KHÔNG bắt input, click xuyên qua được
 
     local isTweening = false
     local function ToggleUI()
         if isTweening then return end; isTweening = true
         if main.Visible then
             -- Close: thu nhỏ + fade overlay
-            overlay.Active = false
-            TweenService:Create(overlay, TweenInfo.new(0.35,Enum.EasingStyle.Quad,Enum.EasingDirection.Out), {BackgroundTransparency=1}):Play()
+            TweenService:Create(overlay, TweenInfo.new(0.3,Enum.EasingStyle.Quad,Enum.EasingDirection.Out), {BackgroundTransparency=1}):Play()
             TweenService:Create(main, TweenInfo.new(0.35,Enum.EasingStyle.Back,Enum.EasingDirection.In),
                 {Size=UDim2.new(0,FRAME_W*0.05,0,FRAME_H*0.05), BackgroundTransparency=1}):Play()
             task.delay(0.35, function()
@@ -267,16 +268,15 @@ function Library:CreateWindow()
                 main.BackgroundTransparency = 0.3
                 overlay.Visible=false
                 openBtn.Visible=true
-                -- openBtn pop in
                 openBtn.Size = UDim2.new(0,0,0,0)
                 TweenService:Create(openBtn, TweenInfo.new(0.4,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Size=UDim2.new(0,50,0,50)}):Play()
                 isTweening=false
             end)
         else
-            -- Open: fade overlay + scale in từ nhỏ
+            -- Open: fade overlay (chỉ visual) + scale in
             openBtn.Visible=false
             overlay.Visible=true; overlay.BackgroundTransparency=1
-            TweenService:Create(overlay, TweenInfo.new(0.3,Enum.EasingStyle.Quad,Enum.EasingDirection.Out), {BackgroundTransparency=0.55}):Play()
+            TweenService:Create(overlay, TweenInfo.new(0.35,Enum.EasingStyle.Quad,Enum.EasingDirection.Out), {BackgroundTransparency=0.5}):Play()
             main.Visible=true
             main.Size=UDim2.new(0,FRAME_W*0.05,0,FRAME_H*0.05)
             main.BackgroundTransparency=1
@@ -285,13 +285,6 @@ function Library:CreateWindow()
             task.delay(0.45, function() isTweening=false end)
         end
     end
-
-    -- Click overlay để đóng
-    overlay.InputBegan:Connect(function(inp)
-        if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
-            PlayClickSound(); ToggleUI()
-        end
-    end)
 
     closeBtn.MouseButton1Click:Connect(function() PlayClickSound(); ToggleUI() end)
     lockBtn.MouseButton1Click:Connect(function()
@@ -633,8 +626,8 @@ function Library:CreateWindow()
     local function MakeDropdown(parent, labelText, yPos, options, savedKey, onCallback)
         local selected = S[savedKey] or options[1]
         local isOpen   = false
-        local ITEM_H   = 22
-        local HEAD_H   = 28
+        local ITEM_H   = 20
+        local HEAD_H   = 24
 
         -- ── Header row ──
         local head = Instance.new("Frame", parent)
@@ -661,20 +654,20 @@ function Library:CreateWindow()
 
         local arrow = Instance.new("TextLabel", head)
         arrow.Size = UDim2.new(0,18,1,0); arrow.Position = UDim2.new(1,-20,0,0)
-        arrow.Text = "▾"; arrow.Font = Enum.Font.GothamBold
-        arrow.TextColor3 = DarkPink; arrow.TextSize = 11; arrow.BackgroundTransparency = 1
+        arrow.Text = "V"; arrow.Font = Enum.Font.GothamBold
+        arrow.TextColor3 = DarkPink; arrow.TextSize = 9; arrow.BackgroundTransparency = 1
 
         -- ── Dropdown list (render ở screenGui để thoát ClipsDescendants) ──
         local listFrame = Instance.new("Frame", screenGui)
-        listFrame.Size = UDim2.new(0, 1, 0, 1)   -- sẽ set đúng khi mở
-        listFrame.BackgroundColor3 = Color3.fromRGB(255,240,244)
-        listFrame.BackgroundTransparency = 0.05
+        listFrame.Size = UDim2.new(0, 1, 0, 1)
+        listFrame.BackgroundColor3 = Color3.fromRGB(255,245,248)
+        listFrame.BackgroundTransparency = 0.02
         listFrame.Visible = false
         listFrame.ZIndex = 50
         listFrame.ClipsDescendants = true
-        Instance.new("UICorner", listFrame).CornerRadius = UDim.new(0,8)
+        Instance.new("UICorner", listFrame).CornerRadius = UDim.new(0,7)
         local listStroke = Instance.new("UIStroke", listFrame)
-        listStroke.Color = DarkPink; listStroke.Thickness = 1.2
+        listStroke.Color = DarkPink; listStroke.Thickness = 1.0
 
         local function GetHeadAbsPos()
             return head.AbsolutePosition, head.AbsoluteSize
@@ -724,7 +717,7 @@ function Library:CreateWindow()
                 item.Position = UDim2.new(0,0,0,(i-1)*ITEM_H+2)
                 item.BackgroundColor3 = (opt == selected)
                     and Color3.fromRGB(255,210,220)
-                    or  Color3.fromRGB(255,240,244)
+                    or  Color3.fromRGB(255,245,248)
                 item.BackgroundTransparency = (opt == selected) and 0.1 or 1
                 item.Text = (opt == selected and "✓  " or "    ") .. opt
                 item.Font = Enum.Font.GothamBold
@@ -763,7 +756,7 @@ function Library:CreateWindow()
             end
 
             -- Animate mở
-            TweenService:Create(arrow, TweenInfo.new(0.2,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Rotation=180}):Play()
+            TweenService:Create(arrow, TweenInfo.new(0.22,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Rotation=180}):Play()
             TweenService:Create(headStroke, TweenInfo.new(0.15), {Transparency=0.3}):Play()
             TweenService:Create(listFrame, TweenInfo.new(0.25,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
                 {Size=UDim2.new(0, listW, 0, totalH)}):Play()
@@ -1181,63 +1174,37 @@ local homeTab = win:CreateTab("Home", "H")
 homeTab:AddDashboard()
 homeTab:AddCreation()
 
--- MAIN TAB
+-- MAIN TAB  (demo thử nghiệm các element)
 local mainTab = win:CreateTab("Main", "M")
 
-mainTab:AddSection("⚙️ Tùy Chọn")
-mainTab:AddToggle("🔔 Hiển Thị Thông Báo", "showNotif", function(val)
-    print("[TokaiHub] Thông báo:", val)
+mainTab:AddSection("🔘 Toggle Test")
+mainTab:AddToggle("Toggle A", "testToggleA", function(val)
+    print("[Toggle A]", val)
 end)
-mainTab:AddToggle("🎵 Âm Thanh Giao Diện", "uiSound", function(val)
-    print("[TokaiHub] Âm thanh:", val)
-end)
-mainTab:AddToggle("🌙 Chế Độ Tối", "darkMode", function(val)
-    print("[TokaiHub] Dark mode:", val)
+mainTab:AddToggle("Toggle B", "testToggleB", function(val)
+    print("[Toggle B]", val)
 end)
 
-mainTab:AddSection("🎚️ Thanh Điều Chỉnh")
-mainTab:AddSlider("💨 Tốc Độ Di Chuyển", 1, 100, "walkSpeed", "", function(val)
-    local char = Players.LocalPlayer.Character
-    if char and char:FindFirstChild("Humanoid") then
-        char.Humanoid.WalkSpeed = val
-    end
+mainTab:AddSection("🎚️ Slider Test")
+mainTab:AddSlider("Slider 1 → 10", 1, 10, "testSlider1", "", function(val)
+    print("[Slider 1]", val)
 end)
-mainTab:AddSlider("🦘 Lực Nhảy", 1, 200, "jumpPower", "", function(val)
-    local char = Players.LocalPlayer.Character
-    if char and char:FindFirstChild("Humanoid") then
-        char.Humanoid.JumpPower = val
-    end
-end)
-mainTab:AddSlider("🔊 Âm Lượng", 0, 100, "volume", "%", function(val)
-    SoundService.AmbientReverb = Enum.ReverbType.NoReverb
-    print("[TokaiHub] Volume:", val)
+mainTab:AddSlider("Slider 0 → 100%", 0, 100, "testSlider2", "%", function(val)
+    print("[Slider 2]", val)
 end)
 
-mainTab:AddSection("📋 Lựa Chọn")
-mainTab:AddDropdown("🎯 Vị Trí Mục Tiêu", {"Head", "Root", "Torso", "LeftArm", "RightArm"}, "targetPart", function(val)
-    print("[TokaiHub] Target:", val)
+mainTab:AddSection("📋 Dropdown Test")
+mainTab:AddDropdown("Chọn bộ phận", {"Head", "Root", "Torso", "LeftArm", "RightArm"}, "testDrop1", function(val)
+    print("[Dropdown 1]", val)
 end)
-mainTab:AddDropdown("⚡ Chế Độ Tốc Độ", {"Bình Thường", "Nhanh", "Rất Nhanh", "Tối Đa"}, "speedMode", function(val)
-    local speeds = {["Bình Thường"]=16, ["Nhanh"]=50, ["Rất Nhanh"]=100, ["Tối Đa"]=200}
-    local char = Players.LocalPlayer.Character
-    if char and char:FindFirstChild("Humanoid") then
-        char.Humanoid.WalkSpeed = speeds[val] or 16
-    end
-end)
-mainTab:AddDropdown("🌍 Ngôn Ngữ", {"Tiếng Việt", "English", "日本語", "한국어"}, "language", function(val)
-    print("[TokaiHub] Language:", val)
+mainTab:AddDropdown("Chọn tùy chọn", {"Option A", "Option B", "Option C"}, "testDrop2", function(val)
+    print("[Dropdown 2]", val)
 end)
 
-mainTab:AddSection("🎮 Hành Động")
-mainTab:AddButton("💨 Reset Nhân Vật", function()
-    Players.LocalPlayer:LoadCharacter()
-end, "Đã reset nhân vật!", "💨")
-mainTab:AddButton("📋 Sao Chép Tên", function()
-    SafeCopy(Players.LocalPlayer.Name)
-end, "Đã sao chép: "..Players.LocalPlayer.Name, "📋")
-mainTab:AddButton("🌐 Thông Tin Game", function()
-    print("Game ID:", game.PlaceId, "| Player:", Players.LocalPlayer.Name)
-end, "Đã in thông tin vào console!", "🌐")
+mainTab:AddSection("🎮 Button Test")
+mainTab:AddButton("▶ Chạy Test", function()
+    print("[Button] Đã nhấn!")
+end, "Test thành công!", "✅")
 
 -- USELESS TAB
 local uselessTab = win:CreateTab("Useless", "🤪")
