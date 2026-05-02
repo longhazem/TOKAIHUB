@@ -624,6 +624,169 @@ function Library:CreateWindow()
         return row
     end
 
+
+    -- ══════════════════════════════════
+    --   DROPDOWN HELPER
+    -- ══════════════════════════════════
+    local activeDropdown = nil  -- chỉ 1 dropdown mở 1 lúc
+
+    local function MakeDropdown(parent, labelText, yPos, options, savedKey, onCallback)
+        local selected = S[savedKey] or options[1]
+        local isOpen   = false
+        local ITEM_H   = 22
+        local HEAD_H   = 28
+
+        -- ── Header row ──
+        local head = Instance.new("Frame", parent)
+        head.Size = UDim2.new(1,-4,0,HEAD_H)
+        head.Position = UDim2.new(0,2,0,yPos)
+        head.BackgroundColor3 = Color3.fromRGB(255,255,255)
+        head.BackgroundTransparency = 0.45
+        head.ClipsDescendants = false
+        Instance.new("UICorner", head).CornerRadius = UDim.new(0,7)
+        local headStroke = Instance.new("UIStroke", head)
+        headStroke.Color = DarkPink; headStroke.Thickness = 1.2
+
+        local lbl = Instance.new("TextLabel", head)
+        lbl.Size = UDim2.new(0.5,0,1,0); lbl.Position = UDim2.new(0,8,0,0)
+        lbl.Text = labelText; lbl.Font = Enum.Font.GothamBold
+        lbl.TextColor3 = TextColor; lbl.TextSize = 9
+        lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.BackgroundTransparency = 1
+
+        local valLbl = Instance.new("TextLabel", head)
+        valLbl.Size = UDim2.new(0.42,0,1,0); valLbl.Position = UDim2.new(0.5,0,0,0)
+        valLbl.Text = selected; valLbl.Font = Enum.Font.GothamBold
+        valLbl.TextColor3 = DarkPink; valLbl.TextSize = 9
+        valLbl.TextXAlignment = Enum.TextXAlignment.Right; valLbl.BackgroundTransparency = 1
+
+        local arrow = Instance.new("TextLabel", head)
+        arrow.Size = UDim2.new(0,18,1,0); arrow.Position = UDim2.new(1,-20,0,0)
+        arrow.Text = "▾"; arrow.Font = Enum.Font.GothamBold
+        arrow.TextColor3 = DarkPink; arrow.TextSize = 11; arrow.BackgroundTransparency = 1
+
+        -- ── Dropdown list (render ở screenGui để thoát ClipsDescendants) ──
+        local listFrame = Instance.new("Frame", screenGui)
+        listFrame.Size = UDim2.new(0, 1, 0, 1)   -- sẽ set đúng khi mở
+        listFrame.BackgroundColor3 = Color3.fromRGB(255,240,244)
+        listFrame.BackgroundTransparency = 0.05
+        listFrame.Visible = false
+        listFrame.ZIndex = 50
+        listFrame.ClipsDescendants = true
+        Instance.new("UICorner", listFrame).CornerRadius = UDim.new(0,8)
+        local listStroke = Instance.new("UIStroke", listFrame)
+        listStroke.Color = DarkPink; listStroke.Thickness = 1.2
+
+        local function GetHeadAbsPos()
+            return head.AbsolutePosition, head.AbsoluteSize
+        end
+
+        local function CloseList(instant)
+            if not isOpen then return end
+            isOpen = false
+            activeDropdown = nil
+            TweenService:Create(arrow, TweenInfo.new(0.2,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Rotation=0}):Play()
+            TweenService:Create(headStroke, TweenInfo.new(0.15), {Transparency=0}):Play()
+            if instant then
+                listFrame.Visible = false
+            else
+                TweenService:Create(listFrame, TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.In),
+                    {Size=UDim2.new(0, listFrame.AbsoluteSize.X, 0, 0), BackgroundTransparency=0.5}):Play()
+                task.delay(0.22, function() listFrame.Visible=false end)
+            end
+        end
+
+        local function OpenList()
+            -- Đóng dropdown khác nếu đang mở
+            if activeDropdown and activeDropdown ~= CloseList then
+                activeDropdown(true)
+            end
+            activeDropdown = CloseList
+            isOpen = true
+
+            local absPos, absSize = GetHeadAbsPos()
+            local totalH = #options * ITEM_H + 4
+            local listW  = absSize.X
+
+            listFrame.Size = UDim2.new(0, listW, 0, 0)
+            listFrame.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 3)
+            listFrame.BackgroundTransparency = 0.05
+            listFrame.Visible = true
+
+            -- Xóa items cũ
+            for _,c in pairs(listFrame:GetChildren()) do
+                if c:IsA("TextButton") or c:IsA("Frame") then c:Destroy() end
+            end
+
+            -- Tạo item cho từng option
+            for i, opt in ipairs(options) do
+                local item = Instance.new("TextButton", listFrame)
+                item.Size = UDim2.new(1,0,0,ITEM_H)
+                item.Position = UDim2.new(0,0,0,(i-1)*ITEM_H+2)
+                item.BackgroundColor3 = (opt == selected)
+                    and Color3.fromRGB(255,210,220)
+                    or  Color3.fromRGB(255,240,244)
+                item.BackgroundTransparency = (opt == selected) and 0.1 or 1
+                item.Text = (opt == selected and "✓  " or "    ") .. opt
+                item.Font = Enum.Font.GothamBold
+                item.TextColor3 = (opt == selected) and DarkPink or TextColor
+                item.TextSize = 9
+                item.TextXAlignment = Enum.TextXAlignment.Left
+                item.ZIndex = 51
+                local pad = Instance.new("UIPadding", item); pad.PaddingLeft = UDim.new(0,8)
+
+                -- Hover item
+                item.MouseEnter:Connect(function()
+                    if opt ~= selected then
+                        TweenService:Create(item, TweenInfo.new(0.12), {BackgroundTransparency=0.5, BackgroundColor3=Color3.fromRGB(255,225,232)}):Play()
+                        item.TextColor3 = DarkPink
+                    end
+                end)
+                item.MouseLeave:Connect(function()
+                    if opt ~= selected then
+                        TweenService:Create(item, TweenInfo.new(0.12), {BackgroundTransparency=1, BackgroundColor3=Color3.fromRGB(255,240,244)}):Play()
+                        item.TextColor3 = TextColor
+                    end
+                end)
+
+                item.MouseButton1Click:Connect(function()
+                    PlayClickSound()
+                    selected = opt
+                    S[savedKey] = selected; Save()
+                    valLbl.Text = selected
+
+                    -- Flash chọn
+                    TweenService:Create(item, TweenInfo.new(0.08), {BackgroundColor3=Color3.fromRGB(200,255,210), BackgroundTransparency=0.1}):Play()
+                    task.delay(0.08, function() CloseList(false) end)
+                    if onCallback then onCallback(selected) end
+                    ShowToast("Đã chọn: "..selected, "✅")
+                end)
+            end
+
+            -- Animate mở
+            TweenService:Create(arrow, TweenInfo.new(0.2,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Rotation=180}):Play()
+            TweenService:Create(headStroke, TweenInfo.new(0.15), {Transparency=0.3}):Play()
+            TweenService:Create(listFrame, TweenInfo.new(0.25,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
+                {Size=UDim2.new(0, listW, 0, totalH)}):Play()
+        end
+
+        -- Toggle khi nhấn header
+        local headBtn = Instance.new("TextButton", head)
+        headBtn.Size = UDim2.new(1,0,1,0); headBtn.BackgroundTransparency = 1; headBtn.Text = ""
+        headBtn.ZIndex = 10
+        headBtn.MouseButton1Click:Connect(function()
+            PlayClickSound()
+            if isOpen then CloseList(false) else OpenList() end
+        end)
+        headBtn.MouseEnter:Connect(function()
+            TweenService:Create(head, TweenInfo.new(0.15), {BackgroundTransparency=0.3}):Play()
+        end)
+        headBtn.MouseLeave:Connect(function()
+            TweenService:Create(head, TweenInfo.new(0.15), {BackgroundTransparency=0.45}):Play()
+        end)
+
+        return head
+    end
+
     -- ══════════════════════════════════
     --   CREATE TAB
     -- ══════════════════════════════════
@@ -951,6 +1114,11 @@ function Library:CreateWindow()
             yOffset = yOffset + 44
         end
 
+        function elements:AddDropdown(text, options, savedKey, callback)
+            MakeDropdown(page, text, yOffset, options, savedKey, callback)
+            yOffset = yOffset + 32
+        end
+
         function elements:AddCreation()
             local card = Instance.new("Frame", page)
             card.Size = UDim2.new(1,0,0,52); card.Position = UDim2.new(0,0,0,yOffset)
@@ -1015,16 +1183,61 @@ homeTab:AddCreation()
 
 -- MAIN TAB
 local mainTab = win:CreateTab("Main", "M")
-mainTab:AddSection("Test Buttons")
-mainTab:AddButton("💨 Reset Character", function()
+
+mainTab:AddSection("⚙️ Tùy Chọn")
+mainTab:AddToggle("🔔 Hiển Thị Thông Báo", "showNotif", function(val)
+    print("[TokaiHub] Thông báo:", val)
+end)
+mainTab:AddToggle("🎵 Âm Thanh Giao Diện", "uiSound", function(val)
+    print("[TokaiHub] Âm thanh:", val)
+end)
+mainTab:AddToggle("🌙 Chế Độ Tối", "darkMode", function(val)
+    print("[TokaiHub] Dark mode:", val)
+end)
+
+mainTab:AddSection("🎚️ Thanh Điều Chỉnh")
+mainTab:AddSlider("💨 Tốc Độ Di Chuyển", 1, 100, "walkSpeed", "", function(val)
+    local char = Players.LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") then
+        char.Humanoid.WalkSpeed = val
+    end
+end)
+mainTab:AddSlider("🦘 Lực Nhảy", 1, 200, "jumpPower", "", function(val)
+    local char = Players.LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") then
+        char.Humanoid.JumpPower = val
+    end
+end)
+mainTab:AddSlider("🔊 Âm Lượng", 0, 100, "volume", "%", function(val)
+    SoundService.AmbientReverb = Enum.ReverbType.NoReverb
+    print("[TokaiHub] Volume:", val)
+end)
+
+mainTab:AddSection("📋 Lựa Chọn")
+mainTab:AddDropdown("🎯 Vị Trí Mục Tiêu", {"Head", "Root", "Torso", "LeftArm", "RightArm"}, "targetPart", function(val)
+    print("[TokaiHub] Target:", val)
+end)
+mainTab:AddDropdown("⚡ Chế Độ Tốc Độ", {"Bình Thường", "Nhanh", "Rất Nhanh", "Tối Đa"}, "speedMode", function(val)
+    local speeds = {["Bình Thường"]=16, ["Nhanh"]=50, ["Rất Nhanh"]=100, ["Tối Đa"]=200}
+    local char = Players.LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") then
+        char.Humanoid.WalkSpeed = speeds[val] or 16
+    end
+end)
+mainTab:AddDropdown("🌍 Ngôn Ngữ", {"Tiếng Việt", "English", "日本語", "한국어"}, "language", function(val)
+    print("[TokaiHub] Language:", val)
+end)
+
+mainTab:AddSection("🎮 Hành Động")
+mainTab:AddButton("💨 Reset Nhân Vật", function()
     Players.LocalPlayer:LoadCharacter()
 end, "Đã reset nhân vật!", "💨")
-mainTab:AddButton("📋 Copy Username", function()
+mainTab:AddButton("📋 Sao Chép Tên", function()
     SafeCopy(Players.LocalPlayer.Name)
 end, "Đã sao chép: "..Players.LocalPlayer.Name, "📋")
-mainTab:AddButton("🌐 Print Game Info", function()
+mainTab:AddButton("🌐 Thông Tin Game", function()
     print("Game ID:", game.PlaceId, "| Player:", Players.LocalPlayer.Name)
-end, "Đã in thông tin game vào console!", "🌐")
+end, "Đã in thông tin vào console!", "🌐")
 
 -- USELESS TAB
 local uselessTab = win:CreateTab("Useless", "🤪")
