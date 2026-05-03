@@ -382,7 +382,7 @@ function Library:CreateWindow()
         -- Xoay gradient liên tục — cùng chiều kim đồng hồ, cùng tốc độ
         coroutine.wrap(function()
             local rot = phaseOffset   -- lệch phase để 1 trái 1 phải
-            local spd = 38            -- °/s, cùng tốc độ, cùng chiều
+            local spd = 18            -- °/s, giảm tốc để nhẹ nhàng hơn
             local last = tick()
             while true do
                 RunService.Heartbeat:Wait()
@@ -668,7 +668,7 @@ function Library:CreateWindow()
 
         knob.InputBegan:Connect(function(inp)
             if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
-                dragging=true
+                dragging=true; dragLocked=true  -- khóa drag window khi kéo slider
                 -- Squeeze knob khi bắt đầu kéo
                 TweenService:Create(knob, TweenInfo.new(0.1,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
                     {Size=UDim2.new(0,KNOB_W+4,0,KNOB_W-3)}):Play()
@@ -676,7 +676,7 @@ function Library:CreateWindow()
         end)
         track.InputBegan:Connect(function(inp)
             if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
-                dragging=true; UpdateFromX(inp.Position.X)
+                dragging=true; dragLocked=true; UpdateFromX(inp.Position.X)
                 TweenService:Create(knob, TweenInfo.new(0.1,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
                     {Size=UDim2.new(0,KNOB_W+4,0,KNOB_W-3)}):Play()
             end
@@ -693,7 +693,7 @@ function Library:CreateWindow()
                     TweenService:Create(knob, TweenInfo.new(0.25,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
                         {Size=UDim2.new(0,KNOB_W,0,KNOB_W)}):Play()
                 end
-                dragging=false
+                dragging=false; dragLocked=false  -- mở lại kéo window
             end
         end)
         -- Hover knob
