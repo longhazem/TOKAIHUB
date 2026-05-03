@@ -332,6 +332,7 @@ function Library:CreateWindow()
     local function CreateGlowBorder(reverse, phaseOffset)
         phaseOffset = phaseOffset or 0
         local border = Instance.new("Frame", screenGui)
+        border.Name                  = "__GlowBorder"
         border.Size                  = UDim2.new(0, FRAME_W, 0, FRAME_H)
         border.Position              = main.Position
         border.AnchorPoint           = Vector2.new(0.5, 0.5)
@@ -342,6 +343,7 @@ function Library:CreateWindow()
 
         local stroke = Instance.new("UIStroke", border)
         stroke.Thickness             = 2
+        stroke.Color                 = Color3.new(1, 1, 1)  -- màu TRẮNG
         stroke.ApplyStrokeMode       = Enum.ApplyStrokeMode.Border
 
         -- Gradient: trắng sáng → trong suốt → trắng sáng
@@ -395,8 +397,12 @@ function Library:CreateWindow()
 
     task.defer(function()
         task.wait(0.1)
-        CreateGlowBorder(false, 0)     -- vệt bên trái  (phase 0°)
-        CreateGlowBorder(false, 180)   -- vệt bên phải  (lệch 180°)
+        -- Xóa borders cũ trước khi tạo mới (tránh tích lũy khi re-exec)
+        for _, v in ipairs(screenGui:GetChildren()) do
+            if v.Name == "__GlowBorder" then v:Destroy() end
+        end
+        CreateGlowBorder(false, 0)     -- vệt 1 (phase 0°)
+        CreateGlowBorder(false, 180)   -- vệt 2 (lệch 180°)
     end)
 
     openBtn.MouseButton1Click:Connect(function() PlayClickSound(); ToggleUI() end)
