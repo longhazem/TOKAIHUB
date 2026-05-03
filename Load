@@ -726,8 +726,8 @@ function Library:CreateWindow()
 
         -- ── Header ──
         local head = Instance.new("Frame", parent)
-        head.Size = UDim2.new(1,-4,0,HEAD_H)
-        head.Position = UDim2.new(0,2,0,yPos)
+        head.Size = UDim2.new(1,-16,0,HEAD_H)  -- hẹp hơn, thêm margin hai bên
+        head.Position = UDim2.new(0,8,0,yPos)
         head.BackgroundColor3 = Color3.fromRGB(255,255,255)
         head.BackgroundTransparency = 0.4
         head.ClipsDescendants = false
@@ -765,13 +765,15 @@ function Library:CreateWindow()
             pillBg.Position = UDim2.new(1, -(pw + 22), 0.5, -9)
         end)
 
-        -- Arrow "V"
+        -- Arrow: < khi đóng, V khi mở
         local arrow = Instance.new("TextLabel", head)
-        arrow.Size = UDim2.new(0,16,1,0); arrow.Position = UDim2.new(1,-18,0,0)
+        arrow.Size = UDim2.new(0,16,0,16)
+        arrow.Position = UDim2.new(1,-18,0.5,-8)
+        arrow.AnchorPoint = Vector2.new(0.5,0.5)
         arrow.Text = "V"; arrow.Font = Enum.Font.GothamBold
         arrow.TextColor3 = DarkPink; arrow.TextSize = 9
         arrow.BackgroundTransparency = 1
-        arrow.AnchorPoint = Vector2.new(0,0)
+        arrow.Rotation = -90  -- bắt đầu dạng <
 
         -- ── List (parent = screenGui, ZIndex cao, nằm TRONG screenGui chính) ──
         local listFrame = Instance.new("Frame", screenGui)
@@ -783,11 +785,19 @@ function Library:CreateWindow()
         Instance.new("UICorner", listFrame).CornerRadius = UDim.new(0,8)
         local listStroke = Instance.new("UIStroke", listFrame)
         listStroke.Color = DarkPink; listStroke.Thickness = 1.0; listStroke.Transparency = 0.4
+        -- UIPadding: items không chạm góc tròn → không có thanh đen
+        local listPad = Instance.new("UIPadding", listFrame)
+        listPad.PaddingTop = UDim.new(0,4); listPad.PaddingBottom = UDim.new(0,4)
+        listPad.PaddingLeft = UDim.new(0,2); listPad.PaddingRight = UDim.new(0,2)
+        -- UIListLayout tự xếp items thẳng hàng
+        local listLayout = Instance.new("UIListLayout", listFrame)
+        listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        listLayout.Padding = UDim.new(0,0)
 
         local function CloseList(instant)
             if not isOpen then return end
             isOpen = false; activeDropdown = nil
-            TweenService:Create(arrow, TweenInfo.new(0.2,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Rotation=0}):Play()
+            TweenService:Create(arrow, TweenInfo.new(0.2,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Rotation=-90}):Play()
             TweenService:Create(headStroke, TweenInfo.new(0.15), {Transparency=0}):Play()
             if instant then
                 listFrame.Visible = false
@@ -807,7 +817,7 @@ function Library:CreateWindow()
             -- Lấy vị trí tuyệt đối của head SAU khi render xong
             local absPos = head.AbsolutePosition
             local absSize = head.AbsoluteSize
-            local totalH = #options * ITEM_H + 6
+            local totalH = #options * ITEM_H + 8  -- +8 = padding top+bottom
             local listW  = absSize.X
 
             -- Xóa items cũ
@@ -819,7 +829,7 @@ function Library:CreateWindow()
             for i, opt in ipairs(options) do
                 local item = Instance.new("TextButton", listFrame)
                 item.Size      = UDim2.new(1,0,0,ITEM_H)
-                item.Position  = UDim2.new(0,0,0,(i-1)*ITEM_H+3)
+                item.LayoutOrder = i  -- UIListLayout tự sắp xếp, không cần Position
                 item.BackgroundColor3 = opt == selected
                     and Color3.fromRGB(255,215,228) or Color3.fromRGB(255,248,251)
                 item.BackgroundTransparency = opt == selected and 0.0 or 1
@@ -880,7 +890,7 @@ function Library:CreateWindow()
             listFrame.Visible = true
 
             -- Animate
-            TweenService:Create(arrow, TweenInfo.new(0.22,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Rotation=180}):Play()
+            TweenService:Create(arrow, TweenInfo.new(0.22,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Rotation=0}):Play()
             TweenService:Create(headStroke, TweenInfo.new(0.15), {Transparency=0.3}):Play()
             TweenService:Create(listFrame, TweenInfo.new(0.25,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
                 {Size=UDim2.new(0, listW, 0, totalH)}):Play()
