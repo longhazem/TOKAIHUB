@@ -217,8 +217,8 @@ function Library:CreateWindow()
 
     local toolbar = Instance.new("Frame", main)
     toolbar.Size = UDim2.new(0,30,0,95); toolbar.Position = UDim2.new(1,5,0,10)
-    toolbar.BackgroundColor3 = Color3.new(1,1,1); toolbar.BackgroundTransparency = 0.5
-    Instance.new("UICorner", toolbar).CornerRadius = UDim.new(0,8)
+    toolbar.BackgroundColor3 = Color3.fromRGB(135, 206, 235); toolbar.BackgroundTransparency = 0.3
+    Instance.new("UICorner", toolbar).CornerRadius = UDim.new(0,15)
     local tbl = Instance.new("UIListLayout", toolbar)
     tbl.Padding = UDim.new(0,5); tbl.HorizontalAlignment = Enum.HorizontalAlignment.Center
     tbl.VerticalAlignment = Enum.VerticalAlignment.Center
@@ -773,7 +773,7 @@ function Library:CreateWindow()
         arrow.Text = "V"; arrow.Font = Enum.Font.GothamBold
         arrow.TextColor3 = DarkPink; arrow.TextSize = 9
         arrow.BackgroundTransparency = 1
-        arrow.Rotation = -90  -- bắt đầu dạng <
+        arrow.Rotation = 90  -- bắt đầu dạng <
 
         -- ── List (parent = screenGui, ZIndex cao, nằm TRONG screenGui chính) ──
         local listFrame = Instance.new("Frame", screenGui)
@@ -797,7 +797,7 @@ function Library:CreateWindow()
         local function CloseList(instant)
             if not isOpen then return end
             isOpen = false; activeDropdown = nil
-            TweenService:Create(arrow, TweenInfo.new(0.2,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Rotation=-90}):Play()
+            TweenService:Create(arrow, TweenInfo.new(0.2,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Rotation=90}):Play()
             TweenService:Create(headStroke, TweenInfo.new(0.15), {Transparency=0}):Play()
             if instant then
                 listFrame.Visible = false
