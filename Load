@@ -267,6 +267,8 @@ function Library:CreateWindow()
     local function ToggleUI()
         if isTweening then return end; isTweening = true
         if main.Visible then
+            -- Đóng dropdown nếu đang mở
+            if activeDropdown then activeDropdown(true) end
             -- Close: thu nhỏ + fade overlay
             TweenService:Create(overlay, TweenInfo.new(0.3,Enum.EasingStyle.Quad,Enum.EasingDirection.Out), {BackgroundTransparency=1}):Play()
             TweenService:Create(main, TweenInfo.new(0.35,Enum.EasingStyle.Back,Enum.EasingDirection.In),
@@ -831,6 +833,12 @@ function Library:CreateWindow()
                 item.Text      = ""
                 local pad = Instance.new("UIPadding", item)
                 pad.PaddingLeft = UDim.new(0,10)
+
+                -- Bo góc item đầu và item cuối cho khớp với listFrame
+                if i == 1 or i == #options then
+                    local corner = Instance.new("UICorner", item)
+                    corner.CornerRadius = UDim.new(0, 8)
+                end
 
                 -- checkmark + text
                 local chk = Instance.new("TextLabel", item)
