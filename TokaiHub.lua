@@ -263,16 +263,12 @@ function Library:CreateWindow()
     overlay.Visible = false
     overlay.Active = false  -- không bắt input
 
-    -- Forward declarations cho animations (dùng trong ToggleUI)
-    local SpawnSparkles, RunShimmer
-
-    local activeDropdown = nil  -- khai báo sớm để ToggleUI có thể dùng
+    local activeDropdown = nil
 
     local isTweening = false
     local function ToggleUI()
         if isTweening then return end; isTweening = true
         if main.Visible then
-            -- Đóng dropdown nếu đang mở
             if activeDropdown then activeDropdown(true) end
             -- Close: thu nhỏ + fade overlay
             TweenService:Create(overlay, TweenInfo.new(0.3,Enum.EasingStyle.Quad,Enum.EasingDirection.Out), {BackgroundTransparency=1}):Play()
@@ -299,11 +295,6 @@ function Library:CreateWindow()
             main.BackgroundTransparency=1
             TweenService:Create(main, TweenInfo.new(0.45,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
                 {Size=UDim2.new(0,FRAME_W,0,FRAME_H), BackgroundTransparency=0.3}):Play()
-            -- Sparkle + shimmer khi mở
-            task.delay(0.2, function()
-                if SpawnSparkles then SpawnSparkles() end
-                if RunShimmer then RunShimmer() end
-            end)
             task.delay(0.45, function() isTweening=false end)
         end
     end
@@ -335,296 +326,6 @@ function Library:CreateWindow()
             mainStroke.Color=c; openStroke.Color=c
         end
     end)()
-
-    -- ══ ANIMATION: OPEN BTN PULSE ══
-    -- Nút mở nhấp nháy nhẹ khi UI đang đóng
-    coroutine.wrap(function()
-        while true do
-            if openBtn.Visible then
-                TweenService:Create(openBtn, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-                    {Size=UDim2.new(0,57,0,57)}):Play()
-                task.wait(0.7)
-                TweenService:Create(openBtn, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-                    {Size=UDim2.new(0,50,0,50)}):Play()
-                task.wait(0.7)
-            else
-                task.wait(0.1)
-            end
-        end
-    end)()
-
-    -- ══ ANIMATION: SHIMMER SWEEP ══
-    -- Ánh sáng quét ngang qua main frame
-    local shimmerFrame = Instance.new("Frame", main)
-    shimmerFrame.Name = "__Shimmer"
-    shimmerFrame.Size = UDim2.new(0.5, 0, 1, 0)
-    shimmerFrame.Position = UDim2.new(-0.55, 0, 0, 0)
-    shimmerFrame.BackgroundColor3 = Color3.new(1, 1, 1)
-    shimmerFrame.BackgroundTransparency = 0.72
-    shimmerFrame.ZIndex = 3
-    shimmerFrame.Active = false
-    shimmerFrame.ClipsDescendants = false
-    Instance.new("UICorner", shimmerFrame).CornerRadius = UDim.new(0, 15)
-    local shimGrad = Instance.new("UIGradient", shimmerFrame)
-    shimGrad.Rotation = 10
-    shimGrad.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0,   1),
-        NumberSequenceKeypoint.new(0.35, 0.4),
-        NumberSequenceKeypoint.new(0.65, 0.4),
-        NumberSequenceKeypoint.new(1,   1),
-    })
-
-    RunShimmer = function()
-        shimmerFrame.Position = UDim2.new(-0.55, 0, 0, 0)
-        TweenService:Create(shimmerFrame, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
-            {Position=UDim2.new(1.1, 0, 0, 0)}):Play()
-    end
-
-    -- Shimmer tự động lặp mỗi 3.5 giây
-    coroutine.wrap(function()
-        task.wait(1)
-        while true do
-            task.wait(3.5)
-            if main.Visible then RunShimmer() end
-        end
-    end)()
-
-    -- ══ ANIMATION: SPARKLE BURST ══
-    -- Tia sáng bùng ra khi UI mở
-    SpawnSparkles = function()
-        for i = 1, 12 do
-            local spark = Instance.new("Frame", screenGui)
-            local sz = math.random(4, 10)
-            spark.Size = UDim2.new(0, sz, 0, sz)
-            local cx = main.AbsolutePosition.X + main.AbsoluteSize.X * 0.5
-            local cy = main.AbsolutePosition.Y + main.AbsoluteSize.Y * 0.5
-            local ox = math.random(-math.floor(FRAME_W * 0.6), math.floor(FRAME_W * 0.6))
-            local oy = math.random(-math.floor(FRAME_H * 0.6), math.floor(FRAME_H * 0.6))
-            spark.Position = UDim2.new(0, cx + ox, 0, cy + oy)
-            spark.AnchorPoint = Vector2.new(0.5, 0.5)
-            local sparkCols = {
-                Color3.fromRGB(255, 180, 200),
-                Color3.fromRGB(255, 220, 240),
-                Color3.fromRGB(235, 110, 140),
-                Color3.fromRGB(190, 220, 255),
-                Color3.fromRGB(255, 255, 200),
-            }
-            spark.BackgroundColor3 = sparkCols[math.random(#sparkCols)]
-            spark.BackgroundTransparency = 0
-            spark.ZIndex = 30
-            Instance.new("UICorner", spark).CornerRadius = UDim.new(1, 0)
-            local dur = 0.45 + math.random() * 0.5
-            TweenService:Create(spark,
-                TweenInfo.new(dur, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                {Size=UDim2.new(0, 0, 0, 0), BackgroundTransparency=1}):Play()
-            game:GetService("Debris"):AddItem(spark, dur + 0.1)
-        end
-    end
-
-    -- ══ ANIMATION: CURSOR SPARKLE TRAIL ══
-    -- Hạt sáng nhỏ theo dõi chuột khi hover lên main frame
-    do
-        local lastTrailPos = Vector2.new(-999, -999)
-        coroutine.wrap(function()
-            while true do
-                RunService.Heartbeat:Wait()
-                if main.Visible then
-                    local mp = UserInputService:GetMouseLocation()
-                    local ma = main.AbsolutePosition
-                    local ms = main.AbsoluteSize
-                    if mp.X >= ma.X and mp.X <= ma.X + ms.X
-                    and mp.Y >= ma.Y and mp.Y <= ma.Y + ms.Y then
-                        local moved = (Vector2.new(mp.X, mp.Y) - lastTrailPos).Magnitude
-                        if moved > 9 then
-                            lastTrailPos = Vector2.new(mp.X, mp.Y)
-                            local tr = Instance.new("Frame", screenGui)
-                            local sz = math.random(3, 7)
-                            tr.Size = UDim2.new(0, sz, 0, sz)
-                            tr.Position = UDim2.new(0, mp.X + math.random(-5,5), 0, mp.Y + math.random(-5,5))
-                            tr.AnchorPoint = Vector2.new(0.5, 0.5)
-                            local cs = {
-                                Color3.fromRGB(255,182,193), Color3.fromRGB(235,110,140),
-                                Color3.fromRGB(255,220,240), Color3.fromRGB(190,220,255),
-                                Color3.fromRGB(255,240,150),
-                            }
-                            tr.BackgroundColor3 = cs[math.random(#cs)]
-                            tr.BackgroundTransparency = 0.1
-                            tr.ZIndex = 50
-                            Instance.new("UICorner", tr).CornerRadius = UDim.new(1, 0)
-                            TweenService:Create(tr, TweenInfo.new(0.42, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                                {Size=UDim2.new(0,0,0,0), BackgroundTransparency=1}):Play()
-                            game:GetService("Debris"):AddItem(tr, 0.45)
-                        end
-                    end
-                end
-            end
-        end)()
-    end
-
-    -- ══ ANIMATION: FLOATING STARS ══
-    -- Các ngôi sao nhỏ trôi ngược lên qua main frame
-    coroutine.wrap(function()
-        while true do
-            task.wait(0.22 + math.random() * 0.28)
-            if main.Visible then
-                local star = Instance.new("Frame", main)
-                local sz = math.random(2, 5)
-                star.Size = UDim2.new(0, sz, 0, sz)
-                local startX = math.random()
-                star.Position = UDim2.new(startX, 0, 1.05, 0)
-                star.BackgroundColor3 = Color3.new(1, 1, 1)
-                star.BackgroundTransparency = math.random() * 0.35 + 0.1
-                star.ZIndex = 2
-                star.Active = false
-                Instance.new("UICorner", star).CornerRadius = UDim.new(1, 0)
-                local dur = 2.8 + math.random() * 2
-                local driftX = (math.random() - 0.5) * 0.25
-                TweenService:Create(star, TweenInfo.new(dur, Enum.EasingStyle.Linear), {
-                    Position = UDim2.new(startX + driftX, 0, -0.15, 0),
-                    BackgroundTransparency = 1,
-                    Size = UDim2.new(0, 0, 0, 0),
-                }):Play()
-                game:GetService("Debris"):AddItem(star, dur + 0.2)
-            end
-        end
-    end)()
-
-    -- ══ ANIMATION: MƯAHOA / HEART & PETAL RAIN ══
-    -- Hoa và trái tim rơi qua UI
-    coroutine.wrap(function()
-        local emojis = {"♥", "✿", "✦", "·", "✩"}
-        while true do
-            task.wait(0.55 + math.random() * 0.55)
-            if main.Visible then
-                local petal = Instance.new("TextLabel", screenGui)
-                petal.Text = emojis[math.random(#emojis)]
-                petal.TextColor3 = Color3.fromRGB(255, math.random(130,195), math.random(150,210))
-                petal.TextSize = math.random(8, 15)
-                petal.Font = Enum.Font.GothamBold
-                petal.BackgroundTransparency = 1
-                petal.Size = UDim2.new(0, 20, 0, 20)
-                petal.ZIndex = 4
-                petal.AnchorPoint = Vector2.new(0.5, 0.5)
-                local ma = main.AbsolutePosition
-                local ms = main.AbsoluteSize
-                local startX = ma.X + math.random() * ms.X
-                petal.Position = UDim2.new(0, startX, 0, ma.Y - 5)
-                local dur = 2.0 + math.random() * 1.5
-                TweenService:Create(petal, TweenInfo.new(dur, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                    Position = UDim2.new(0, startX + math.random(-30,30), 0, ma.Y + ms.Y + 10),
-                    TextTransparency = 1,
-                    Rotation = math.random(-200, 200),
-                }):Play()
-                game:GetService("Debris"):AddItem(petal, dur + 0.1)
-            end
-        end
-    end)()
-
-    -- ══ ANIMATION: BACKGROUND COLOR WAVE ══
-    -- Nền main frame đổi màu nhẹ nhàng theo chu kỳ
-    coroutine.wrap(function()
-        local palette = {
-            Color3.fromRGB(255, 182, 193),
-            Color3.fromRGB(255, 200, 215),
-            Color3.fromRGB(248, 175, 198),
-            Color3.fromRGB(255, 192, 210),
-        }
-        local idx = 1
-        while true do
-            task.wait(4)
-            idx = (idx % #palette) + 1
-            TweenService:Create(main, TweenInfo.new(4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-                {BackgroundColor3 = palette[idx]}):Play()
-        end
-    end)()
-
-    -- ══ ANIMATION: GLOW RINGS FROM OPEN BTN ══
-    -- Vòng sáng mở rộng từ nút mở khi UI đóng
-    coroutine.wrap(function()
-        while true do
-            task.wait(1.6)
-            if openBtn.Visible then
-                local ring = Instance.new("Frame", screenGui)
-                ring.Size = UDim2.new(0, 50, 0, 50)
-                ring.Position = openBtn.Position
-                ring.AnchorPoint = Vector2.new(0, 0)
-                ring.BackgroundTransparency = 1
-                ring.ZIndex = 5
-                local rs = Instance.new("UIStroke", ring)
-                rs.Thickness = 2.5
-                rs.Color = Color3.fromRGB(255, 182, 193)
-                rs.Transparency = 0
-                Instance.new("UICorner", ring).CornerRadius = UDim.new(1, 0)
-                TweenService:Create(ring, TweenInfo.new(1.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                    Size = UDim2.new(0, 90, 0, 90),
-                    Position = UDim2.new(
-                        openBtn.Position.X.Scale, openBtn.Position.X.Offset - 20,
-                        openBtn.Position.Y.Scale, openBtn.Position.Y.Offset - 20
-                    ),
-                }):Play()
-                TweenService:Create(rs, TweenInfo.new(1.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                    {Transparency = 1}):Play()
-                game:GetService("Debris"):AddItem(ring, 1.5)
-            end
-        end
-    end)()
-
-    -- ══ ANIMATION: NHỊP TIM / HEARTBEAT PULSE ══
-    -- Main frame nhấp nhô nhẹ theo nhịp tim mỗi vài giây
-    coroutine.wrap(function()
-        while true do
-            task.wait(4 + math.random() * 2)
-            if main.Visible then
-                TweenService:Create(main, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                    {Size=UDim2.new(0, FRAME_W+5, 0, FRAME_H+5)}):Play()
-                task.wait(0.12)
-                TweenService:Create(main, TweenInfo.new(0.09, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-                    {Size=UDim2.new(0, FRAME_W, 0, FRAME_H)}):Play()
-                task.wait(0.12)
-                TweenService:Create(main, TweenInfo.new(0.09, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                    {Size=UDim2.new(0, FRAME_W+3, 0, FRAME_H+3)}):Play()
-                task.wait(0.09)
-                TweenService:Create(main, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-                    {Size=UDim2.new(0, FRAME_W, 0, FRAME_H)}):Play()
-            end
-        end
-    end)()
-
-    -- ══ ANIMATION: GENTLE FLOAT ══
-    -- Main frame lơ lửng lên xuống nhẹ nhàng khi không tương tác
-    do
-        local floatBase = {x = 0, y = 0}
-        local lastInteract = tick()
-        local function OnInteract(inp)
-            if inp.UserInputType == Enum.UserInputType.MouseButton1
-            or inp.UserInputType == Enum.UserInputType.Touch then
-                lastInteract = tick()
-                floatBase.x = main.Position.X.Offset
-                floatBase.y = main.Position.Y.Offset
-            end
-        end
-        UserInputService.InputBegan:Connect(OnInteract)
-        UserInputService.InputEnded:Connect(OnInteract)
-        coroutine.wrap(function()
-            task.wait(0.5)
-            floatBase.x = main.Position.X.Offset
-            floatBase.y = main.Position.Y.Offset
-            while true do
-                RunService.Heartbeat:Wait()
-                if main.Visible then
-                    local idle = tick() - lastInteract
-                    if idle > 1.5 then
-                        local strength = math.min((idle - 1.5) / 0.7, 1) * 3.5
-                        local offset   = math.sin(tick() * 0.5) * strength
-                        main.Position  = UDim2.new(
-                            main.Position.X.Scale, floatBase.x,
-                            main.Position.Y.Scale, floatBase.y + offset
-                        )
-                    end
-                end
-            end
-        end)()
-    end
 
     -- ══ BORDER RUNNER dùng ý tưởng của user ══
     -- Tạo 2 Frame viền clone y hệt main (trong suốt hoàn toàn)
@@ -832,33 +533,6 @@ function Library:CreateWindow()
             end)
             if toastMsg then ShowToast(toastMsg, toastIcon) end
             if callback then callback() end
-            -- Mini confetti từ nút
-            task.spawn(function()
-                local ba = btn.AbsolutePosition
-                local bs = btn.AbsoluteSize
-                for _c = 1, 7 do
-                    local cf = Instance.new("Frame", screenGui)
-                    cf.Size = UDim2.new(0, math.random(3,7), 0, math.random(3,7))
-                    cf.Position = UDim2.new(0, ba.X + bs.X*0.5 + math.random(-18,18),
-                                               0, ba.Y + bs.Y*0.5 + math.random(-8,8))
-                    cf.AnchorPoint = Vector2.new(0.5,0.5)
-                    local cc = {Color3.fromRGB(255,182,193), Color3.fromRGB(235,110,140),
-                                Color3.fromRGB(190,220,255), Color3.fromRGB(255,240,150)}
-                    cf.BackgroundColor3 = cc[math.random(#cc)]
-                    cf.BackgroundTransparency = 0
-                    cf.ZIndex = 30
-                    Instance.new("UICorner", cf).CornerRadius = UDim.new(1,0)
-                    local fx = math.random(-45,45)
-                    local fy = math.random(-40,-8)
-                    local dur = 0.38 + math.random()*0.32
-                    TweenService:Create(cf, TweenInfo.new(dur, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                        Position = UDim2.new(0, ba.X+bs.X*0.5+fx, 0, ba.Y+bs.Y*0.5+fy),
-                        BackgroundTransparency = 1,
-                        Size = UDim2.new(0,0,0,0),
-                    }):Play()
-                    game:GetService("Debris"):AddItem(cf, dur+0.1)
-                end
-            end)
         end)
 
         -- Hover: lift lên + stroke sáng hơn
@@ -913,6 +587,11 @@ function Library:CreateWindow()
             TweenService:Create(pill, TweenInfo.new(0.22,Enum.EasingStyle.Quad), {BackgroundColor3=state and Green or Gray}):Play()
             TweenService:Create(pillGlow, TweenInfo.new(0.25), {Transparency=state and 0.3 or 1}):Play()
             TweenService:Create(rowStroke, TweenInfo.new(0.25), {Color=state and Green or Color3.fromRGB(200,200,200)}):Play()
+            -- Row flash nhẹ
+            TweenService:Create(row, TweenInfo.new(0.1), {BackgroundTransparency=0.2}):Play()
+            task.delay(0.1, function()
+                TweenService:Create(row, TweenInfo.new(0.2), {BackgroundTransparency=0.45}):Play()
+            end)
             -- Knob: squeeze rồi bounce về đích
             local targetPos = state and UDim2.new(1,-14,0.5,-6) or UDim2.new(0,2,0.5,-6)
             TweenService:Create(knob, TweenInfo.new(0.08,Enum.EasingStyle.Quad,Enum.EasingDirection.In),
@@ -922,34 +601,6 @@ function Library:CreateWindow()
                     {Position=targetPos, Size=UDim2.new(0,12,0,12)}):Play()
             end)
             if onCallback then onCallback(state) end
-            -- Particle burst khi bật ON
-            if newState then
-                task.spawn(function()
-                    local pa = pill.AbsolutePosition
-                    local ps = pill.AbsoluteSize
-                    for p = 1, 10 do
-                        local pf = Instance.new("Frame", screenGui)
-                        pf.Size = UDim2.new(0, math.random(3,7), 0, math.random(3,7))
-                        pf.Position = UDim2.new(0, pa.X + ps.X*0.5, 0, pa.Y + ps.Y*0.5)
-                        pf.AnchorPoint = Vector2.new(0.5,0.5)
-                        pf.BackgroundColor3 = (p % 2 == 0) and Green or Color3.fromRGB(180,255,200)
-                        pf.BackgroundTransparency = 0
-                        pf.ZIndex = 30
-                        Instance.new("UICorner", pf).CornerRadius = UDim.new(1,0)
-                        local angle = (p/10) * math.pi * 2
-                        local dist  = math.random(18, 38)
-                        local tx = pa.X + ps.X*0.5 + math.cos(angle)*dist
-                        local ty = pa.Y + ps.Y*0.5 + math.sin(angle)*dist
-                        local dur = 0.4 + math.random()*0.25
-                        TweenService:Create(pf, TweenInfo.new(dur, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                            Position = UDim2.new(0, tx, 0, ty),
-                            BackgroundTransparency = 1,
-                            Size = UDim2.new(0,0,0,0),
-                        }):Play()
-                        game:GetService("Debris"):AddItem(pf, dur+0.1)
-                    end
-                end)
-            end
         end
 
         local btn = Instance.new("TextButton", row)
@@ -1025,17 +676,16 @@ function Library:CreateWindow()
 
         knob.InputBegan:Connect(function(inp)
             if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
-                dragging=true; dragLocked=true  -- khóa drag window khi kéo slider
-                -- Squeeze knob khi bắt đầu kéo
-                TweenService:Create(knob, TweenInfo.new(0.1,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
-                    {Size=UDim2.new(0,KNOB_W+4,0,KNOB_W-3)}):Play()
+                dragging=true; dragLocked=true
+                TweenService:Create(knob, TweenInfo.new(0.15,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),
+                    {Size=UDim2.new(0,KNOB_W+3,0,KNOB_W+3)}):Play()
             end
         end)
         track.InputBegan:Connect(function(inp)
             if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
                 dragging=true; dragLocked=true; UpdateFromX(inp.Position.X)
-                TweenService:Create(knob, TweenInfo.new(0.1,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
-                    {Size=UDim2.new(0,KNOB_W+4,0,KNOB_W-3)}):Play()
+                TweenService:Create(knob, TweenInfo.new(0.15,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),
+                    {Size=UDim2.new(0,KNOB_W+3,0,KNOB_W+3)}):Play()
             end
         end)
         UserInputService.InputChanged:Connect(function(inp)
@@ -1045,12 +695,10 @@ function Library:CreateWindow()
         end)
         UserInputService.InputEnded:Connect(function(inp)
             if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
-                if dragging then
-                    -- Bounce về size gốc khi thả
-                    TweenService:Create(knob, TweenInfo.new(0.25,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
-                        {Size=UDim2.new(0,KNOB_W,0,KNOB_W)}):Play()
-                end
-                dragging=false; dragLocked=false  -- mở lại kéo window
+                -- Luôn thu về dù có kéo hay chỉ giữ
+                TweenService:Create(knob, TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),
+                    {Size=UDim2.new(0,KNOB_W,0,KNOB_W)}):Play()
+                dragging=false; dragLocked=false
             end
         end)
         -- Hover knob
@@ -1073,6 +721,7 @@ function Library:CreateWindow()
     -- ══════════════════════════════════
     --   DROPDOWN HELPER
     -- ══════════════════════════════════
+
 
     local function MakeDropdown(parent, labelText, yPos, options, savedKey, onCallback)
         local selected = S[savedKey] or options[1]
@@ -1188,12 +837,6 @@ function Library:CreateWindow()
                 local pad = Instance.new("UIPadding", item)
                 pad.PaddingLeft = UDim.new(0,10)
 
-                -- Bo góc item đầu và item cuối cho khớp với listFrame
-                if i == 1 or i == #options then
-                    local corner = Instance.new("UICorner", item)
-                    corner.CornerRadius = UDim.new(0, 8)
-                end
-
                 -- checkmark + text
                 local chk = Instance.new("TextLabel", item)
                 chk.Size = UDim2.new(0,12,1,0); chk.Position = UDim2.new(0,0,0,0)
@@ -1224,7 +867,6 @@ function Library:CreateWindow()
                     PlayClickSound()
                     selected = opt; S[savedKey] = selected; Save()
                     valLbl.Text = selected
-                    -- Reposition pill
                     task.defer(function()
                         local pw = pillBg.AbsoluteSize.X
                         pillBg.Position = UDim2.new(1, -(pw+22), 0.5, -9)
@@ -1233,6 +875,17 @@ function Library:CreateWindow()
                     task.delay(0.07, function() CloseList(false) end)
                     if onCallback then onCallback(selected) end
                     ShowToast("Đã chọn: "..selected, "✅")
+                end)
+
+                -- Stagger fade-in từng item
+                item.BackgroundTransparency = 1
+                local targetTrans = opt == selected and 0.0 or 1
+                task.delay(0.04 * i, function()
+                    if item and item.Parent then
+                        item.Position = UDim2.new(0.05, 0, 0, (i-1)*ITEM_H+3)
+                        TweenService:Create(item, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                            {BackgroundTransparency=targetTrans, Position=UDim2.new(0,0,0,(i-1)*ITEM_H+3)}):Play()
+                    end
                 end)
             end
 
@@ -1636,9 +1289,12 @@ function Library:CreateWindow()
 
         function elements:AddSection(text)
             local lbl = Instance.new("TextLabel", page)
-            lbl.Size=UDim2.new(1,-4,0,18); lbl.Position=UDim2.new(0,2,0,yOffset)
+            lbl.Size=UDim2.new(1,-4,0,18); lbl.Position=UDim2.new(0.04,0,0,yOffset)
             lbl.Text="── "..text.." ──"; lbl.Font=Enum.Font.GothamBold
             lbl.TextColor3=DarkPink; lbl.TextSize=9; lbl.BackgroundTransparency=1
+            lbl.TextTransparency=1
+            TweenService:Create(lbl, TweenInfo.new(0.35,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),
+                {TextTransparency=0, Position=UDim2.new(0,2,0,yOffset)}):Play()
             yOffset = yOffset + 22
         end
 
@@ -1664,10 +1320,6 @@ function Library:CreateWindow()
         main.BackgroundTransparency = 1
         TweenService:Create(main, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
             {Size = UDim2.new(0, FRAME_W, 0, FRAME_H), BackgroundTransparency = 0.3}):Play()
-        task.delay(0.3, function()
-            if SpawnSparkles then SpawnSparkles() end
-            if RunShimmer then RunShimmer() end
-        end)
     end)
 
     return Library
