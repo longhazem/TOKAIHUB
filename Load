@@ -263,6 +263,8 @@ function Library:CreateWindow()
     overlay.Visible = false
     overlay.Active = false  -- không bắt input
 
+    local activeDropdown = nil  -- khai báo sớm để ToggleUI có thể dùng
+
     local isTweening = false
     local function ToggleUI()
         if isTweening then return end; isTweening = true
@@ -718,7 +720,6 @@ function Library:CreateWindow()
     -- ══════════════════════════════════
     --   DROPDOWN HELPER
     -- ══════════════════════════════════
-    local activeDropdown = nil  -- chỉ 1 dropdown mở 1 lúc
 
     local function MakeDropdown(parent, labelText, yPos, options, savedKey, onCallback)
         local selected = S[savedKey] or options[1]
