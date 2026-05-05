@@ -178,7 +178,7 @@ local Library = {}
 function Library:CreateWindow()
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "TOKAIHUB"
-    screenGui.DisplayOrder = 10   -- UI chính nằm TRÊN overlay
+    screenGui.DisplayOrder = 10
     screenGui.Parent = GetGuiParent()
     screenGui.ResetOnSpawn = false
     screenGui.IgnoreGuiInset = true
@@ -211,7 +211,7 @@ function Library:CreateWindow()
     main.Position = UDim2.new(0.5,0,0.5,0); main.AnchorPoint = Vector2.new(0.5,0.5)
     main.BackgroundColor3 = MainColor; main.BackgroundTransparency = 0.3
     main.Parent = screenGui; main.ClipsDescendants = false
-    main.Visible = false   -- ẩn ban đầu, sẽ open qua ToggleUI
+    main.Visible = false
     Instance.new("UICorner", main).CornerRadius = UDim.new(0,15)
     local mainStroke = Instance.new("UIStroke", main); mainStroke.Thickness = 2
 
@@ -250,18 +250,17 @@ function Library:CreateWindow()
     local lockBtn  = MakeToolBtn("🔓", Color3.fromRGB(80,200,80))
     local keyBtn   = MakeToolBtn("⌨",  DarkPink)
 
-    -- ── Overlay mờ: ScreenGui riêng với DisplayOrder THẤP hơn screenGui ──
     local overlayGui = Instance.new("ScreenGui", GetGuiParent())
     overlayGui.Name = "TOKAIHUB_OVERLAY"
     overlayGui.ResetOnSpawn = false
     overlayGui.IgnoreGuiInset = true
-    overlayGui.DisplayOrder = -1   -- nằm dưới screenGui (DisplayOrder mặc định = 0)
+    overlayGui.DisplayOrder = -1
     local overlay = Instance.new("Frame", overlayGui)
     overlay.Size = UDim2.new(1,0,1,0); overlay.Position = UDim2.new(0,0,0,0)
     overlay.BackgroundColor3 = Color3.fromRGB(10,5,10)
     overlay.BackgroundTransparency = 1
     overlay.Visible = false
-    overlay.Active = false  -- không bắt input
+    overlay.Active = false
 
     local activeDropdown = nil
 
@@ -270,7 +269,6 @@ function Library:CreateWindow()
         if isTweening then return end; isTweening = true
         if main.Visible then
             if activeDropdown then activeDropdown(true) end
-            -- Close: thu nhỏ + fade overlay
             TweenService:Create(overlay, TweenInfo.new(0.3,Enum.EasingStyle.Quad,Enum.EasingDirection.Out), {BackgroundTransparency=1}):Play()
             TweenService:Create(main, TweenInfo.new(0.35,Enum.EasingStyle.Back,Enum.EasingDirection.In),
                 {Size=UDim2.new(0,FRAME_W*0.05,0,FRAME_H*0.05), BackgroundTransparency=1}):Play()
@@ -284,11 +282,9 @@ function Library:CreateWindow()
                 isTweening=false
             end)
         else
-            -- Open: reset về giữa màn hình + fade overlay + scale in
             openBtn.Visible=false
             overlay.Visible=true; overlay.BackgroundTransparency=1
             TweenService:Create(overlay, TweenInfo.new(0.35,Enum.EasingStyle.Quad,Enum.EasingDirection.Out), {BackgroundTransparency=0.5}):Play()
-            -- Reset position về giữa trước khi scale in
             main.Position = UDim2.new(0.5,0,0.5,0)
             main.Visible=true
             main.Size=UDim2.new(0,FRAME_W*0.05,0,FRAME_H*0.05)
@@ -317,7 +313,6 @@ function Library:CreateWindow()
         end)
     end)
 
-    -- ══ RAINBOW STROKE (main border color cycle) ══
     coroutine.wrap(function()
         local cols = {Color3.fromRGB(255,255,255),Color3.fromRGB(255,192,203),Color3.fromRGB(230,190,255)}
         while task.wait() do
@@ -327,11 +322,6 @@ function Library:CreateWindow()
         end
     end)()
 
-    -- ══ BORDER RUNNER dùng ý tưởng của user ══
-    -- Tạo 2 Frame viền clone y hệt main (trong suốt hoàn toàn)
-    -- Mỗi Frame có UIStroke với UIGradient chạy rotation liên tục
-    -- → ánh sáng quét quanh viền theo gradient xoay, 1 thuận 1 ngược
-
     local function CreateGlowBorder(reverse, phaseOffset)
         phaseOffset = phaseOffset or 0
         local border = Instance.new("Frame", screenGui)
@@ -339,18 +329,16 @@ function Library:CreateWindow()
         border.Size                  = UDim2.new(0, FRAME_W, 0, FRAME_H)
         border.Position              = main.Position
         border.AnchorPoint           = Vector2.new(0.5, 0.5)
-        border.BackgroundTransparency = 1        -- trong suốt hoàn toàn
+        border.BackgroundTransparency = 1
         border.ZIndex                = 2
         border.Active                = false
         Instance.new("UICorner", border).CornerRadius = UDim.new(0, 15)
 
         local stroke = Instance.new("UIStroke", border)
         stroke.Thickness             = 2
-        stroke.Color                 = Color3.new(1, 1, 1)  -- màu TRẮNG
+        stroke.Color                 = Color3.new(1, 1, 1)
         stroke.ApplyStrokeMode       = Enum.ApplyStrokeMode.Border
 
-        -- Gradient: trắng sáng → trong suốt → trắng sáng
-        -- Xoay gradient liên tục → ánh sáng chạy quanh viền
         local grad = Instance.new("UIGradient", stroke)
         grad.Color = ColorSequence.new({
             ColorSequenceKeypoint.new(0,   Color3.new(1,1,1)),
@@ -369,7 +357,6 @@ function Library:CreateWindow()
             NumberSequenceKeypoint.new(1,    1   ),
         })
 
-        -- Đồng bộ position với main khi user drag
         coroutine.wrap(function()
             while true do
                 RunService.Heartbeat:Wait()
@@ -382,10 +369,9 @@ function Library:CreateWindow()
             end
         end)()
 
-        -- Xoay gradient liên tục — cùng chiều kim đồng hồ, cùng tốc độ
         coroutine.wrap(function()
-            local rot = phaseOffset   -- lệch phase để 1 trái 1 phải
-            local spd = 18            -- °/s, giảm tốc để nhẹ nhàng hơn
+            local rot = phaseOffset
+            local spd = 18
             local last = tick()
             while true do
                 RunService.Heartbeat:Wait()
@@ -400,12 +386,11 @@ function Library:CreateWindow()
 
     task.defer(function()
         task.wait(0.1)
-        -- Xóa borders cũ trước khi tạo mới (tránh tích lũy khi re-exec)
         for _, v in ipairs(screenGui:GetChildren()) do
             if v.Name == "__GlowBorder" then v:Destroy() end
         end
-        CreateGlowBorder(false, 0)     -- vệt 1 (phase 0°)
-        CreateGlowBorder(false, 180)   -- vệt 2 (lệch 180°)
+        CreateGlowBorder(false, 0)
+        CreateGlowBorder(false, 180)
     end)
 
     openBtn.MouseButton1Click:Connect(function() PlayClickSound(); ToggleUI() end)
@@ -469,12 +454,13 @@ function Library:CreateWindow()
 
     EnableDrag(main); EnableDrag(openBtn)
 
+    -- ══ SIDEBAR — giờ rộng hơn một chút để chứa ảnh đẹp hơn ══
     local sidebar = Instance.new("Frame", main)
-    sidebar.Size=UDim2.new(0,35,0,200); sidebar.Position=UDim2.new(1,-40,0.5,-100)
+    sidebar.Size=UDim2.new(0,38,0,210); sidebar.Position=UDim2.new(1,-43,0.5,-105)
     sidebar.BackgroundColor3=Color3.fromRGB(255,255,255); sidebar.BackgroundTransparency=0.65
-    Instance.new("UICorner", sidebar).CornerRadius=UDim.new(1,0)
+    Instance.new("UICorner", sidebar).CornerRadius=UDim.new(0,10)
     local sbl = Instance.new("UIListLayout", sidebar)
-    sbl.Padding=UDim.new(0,7); sbl.HorizontalAlignment=Enum.HorizontalAlignment.Center
+    sbl.Padding=UDim.new(0,6); sbl.HorizontalAlignment=Enum.HorizontalAlignment.Center
     sbl.VerticalAlignment=Enum.VerticalAlignment.Center
 
     local tabContainer = Instance.new("Frame", main)
@@ -499,7 +485,6 @@ function Library:CreateWindow()
         Instance.new("UICorner", btn).CornerRadius = UDim.new(0,7)
         local stroke = Instance.new("UIStroke", btn); stroke.Color = DarkPink; stroke.Thickness = 1.2
 
-        -- Ripple effect
         local function SpawnRipple(inputX, inputY)
             local ripple = Instance.new("Frame", btn)
             local rx = inputX - btn.AbsolutePosition.X
@@ -512,7 +497,6 @@ function Library:CreateWindow()
             ripple.BackgroundTransparency = 0.55
             ripple.ZIndex = 5
             Instance.new("UICorner", ripple).CornerRadius = UDim.new(1,0)
-            -- Ripple chậm hơn và fade đẹp hơn
             TweenService:Create(ripple, TweenInfo.new(0.85, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
                 {Size=UDim2.new(0,maxR,0,maxR)}):Play()
             TweenService:Create(ripple, TweenInfo.new(0.85, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
@@ -524,7 +508,6 @@ function Library:CreateWindow()
             PlayClickSound()
             local mp = UserInputService:GetMouseLocation()
             SpawnRipple(mp.X, mp.Y)
-            -- Press squish
             TweenService:Create(btn, TweenInfo.new(0.07,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),
                 {Size=UDim2.new(1,-8,0,25), Position=UDim2.new(0,4,0,yPos+1.5)}):Play()
             task.delay(0.07, function()
@@ -535,7 +518,6 @@ function Library:CreateWindow()
             if callback then callback() end
         end)
 
-        -- Hover: lift lên + stroke sáng hơn
         btn.MouseEnter:Connect(function()
             TweenService:Create(btn, TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),
                 {BackgroundColor3=Color3.fromRGB(255,225,232), Position=UDim2.new(0,2,0,yPos-1)}):Play()
@@ -556,7 +538,6 @@ function Library:CreateWindow()
         row.Size = UDim2.new(1,-4,0,26); row.Position = UDim2.new(0,2,0,yPos)
         row.BackgroundColor3 = Color3.fromRGB(255,255,255); row.BackgroundTransparency = 0.45
         Instance.new("UICorner", row).CornerRadius = UDim.new(0,7)
-        -- Border đổi màu theo state
         local rowStroke = Instance.new("UIStroke", row)
         rowStroke.Color = state and Green or Color3.fromRGB(200,200,200)
         rowStroke.Thickness = 1; rowStroke.Transparency = 0.5
@@ -571,7 +552,6 @@ function Library:CreateWindow()
         pill.Size = UDim2.new(0,36,0,16); pill.Position = UDim2.new(1,-42,0.5,-8)
         pill.BackgroundColor3 = state and Green or Gray
         Instance.new("UICorner", pill).CornerRadius = UDim.new(1,0)
-        -- Glow quanh pill khi bật
         local pillGlow = Instance.new("UIStroke", pill)
         pillGlow.Color = Green; pillGlow.Thickness = 2
         pillGlow.Transparency = state and 0.3 or 1
@@ -587,12 +567,6 @@ function Library:CreateWindow()
             TweenService:Create(pill, TweenInfo.new(0.22,Enum.EasingStyle.Quad), {BackgroundColor3=state and Green or Gray}):Play()
             TweenService:Create(pillGlow, TweenInfo.new(0.25), {Transparency=state and 0.3 or 1}):Play()
             TweenService:Create(rowStroke, TweenInfo.new(0.25), {Color=state and Green or Color3.fromRGB(200,200,200)}):Play()
-            -- Row flash nhẹ
-            TweenService:Create(row, TweenInfo.new(0.1), {BackgroundTransparency=0.2}):Play()
-            task.delay(0.1, function()
-                TweenService:Create(row, TweenInfo.new(0.2), {BackgroundTransparency=0.45}):Play()
-            end)
-            -- Knob: squeeze rồi bounce về đích
             local targetPos = state and UDim2.new(1,-14,0.5,-6) or UDim2.new(0,2,0.5,-6)
             TweenService:Create(knob, TweenInfo.new(0.08,Enum.EasingStyle.Quad,Enum.EasingDirection.In),
                 {Size=UDim2.new(0,10,0,14)}):Play()
@@ -677,15 +651,15 @@ function Library:CreateWindow()
         knob.InputBegan:Connect(function(inp)
             if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
                 dragging=true; dragLocked=true
-                TweenService:Create(knob, TweenInfo.new(0.15,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),
-                    {Size=UDim2.new(0,KNOB_W+3,0,KNOB_W+3)}):Play()
+                TweenService:Create(knob, TweenInfo.new(0.1,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
+                    {Size=UDim2.new(0,KNOB_W+4,0,KNOB_W-3)}):Play()
             end
         end)
         track.InputBegan:Connect(function(inp)
             if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
                 dragging=true; dragLocked=true; UpdateFromX(inp.Position.X)
-                TweenService:Create(knob, TweenInfo.new(0.15,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),
-                    {Size=UDim2.new(0,KNOB_W+3,0,KNOB_W+3)}):Play()
+                TweenService:Create(knob, TweenInfo.new(0.1,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
+                    {Size=UDim2.new(0,KNOB_W+4,0,KNOB_W-3)}):Play()
             end
         end)
         UserInputService.InputChanged:Connect(function(inp)
@@ -695,13 +669,13 @@ function Library:CreateWindow()
         end)
         UserInputService.InputEnded:Connect(function(inp)
             if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
-                -- Luôn thu về dù có kéo hay chỉ giữ
-                TweenService:Create(knob, TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),
-                    {Size=UDim2.new(0,KNOB_W,0,KNOB_W)}):Play()
+                if dragging then
+                    TweenService:Create(knob, TweenInfo.new(0.25,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
+                        {Size=UDim2.new(0,KNOB_W,0,KNOB_W)}):Play()
+                end
                 dragging=false; dragLocked=false
             end
         end)
-        -- Hover knob
         knob.MouseEnter:Connect(function()
             if not dragging then
                 TweenService:Create(knob, TweenInfo.new(0.15,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
@@ -717,11 +691,9 @@ function Library:CreateWindow()
         return row
     end
 
-
     -- ══════════════════════════════════
     --   DROPDOWN HELPER
     -- ══════════════════════════════════
-
 
     local function MakeDropdown(parent, labelText, yPos, options, savedKey, onCallback)
         local selected = S[savedKey] or options[1]
@@ -729,7 +701,6 @@ function Library:CreateWindow()
         local ITEM_H   = 22
         local HEAD_H   = 26
 
-        -- ── Header ──
         local head = Instance.new("Frame", parent)
         head.Size = UDim2.new(1,-4,0,HEAD_H)
         head.Position = UDim2.new(0,2,0,yPos)
@@ -740,7 +711,6 @@ function Library:CreateWindow()
         local headStroke = Instance.new("UIStroke", head)
         headStroke.Color = DarkPink; headStroke.Thickness = 1.2
 
-        -- Label trái
         local lbl = Instance.new("TextLabel", head)
         lbl.Size = UDim2.new(0,0,1,0); lbl.AutomaticSize = Enum.AutomaticSize.X
         lbl.Position = UDim2.new(0,8,0,0)
@@ -748,10 +718,9 @@ function Library:CreateWindow()
         lbl.TextColor3 = TextColor; lbl.TextSize = 9
         lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.BackgroundTransparency = 1
 
-        -- Pill giá trị đang chọn (bên phải)
         local pillBg = Instance.new("Frame", head)
         pillBg.Size = UDim2.new(0,0,0,18); pillBg.AutomaticSize = Enum.AutomaticSize.X
-        pillBg.Position = UDim2.new(1,-24,0.5,-9)   -- sẽ update sau khi có valLbl
+        pillBg.Position = UDim2.new(1,-24,0.5,-9)
         pillBg.BackgroundColor3 = Color3.fromRGB(255,210,225)
         pillBg.BackgroundTransparency = 0.2
         Instance.new("UICorner", pillBg).CornerRadius = UDim.new(1,0)
@@ -764,13 +733,11 @@ function Library:CreateWindow()
         valLbl.TextColor3 = DarkPink; valLbl.TextSize = 8
         valLbl.BackgroundTransparency = 1
 
-        -- Reposition pill dựa vào width thực
         task.defer(function()
             local pw = pillBg.AbsoluteSize.X
             pillBg.Position = UDim2.new(1, -(pw + 22), 0.5, -9)
         end)
 
-        -- Arrow "V"
         local arrow = Instance.new("TextLabel", head)
         arrow.Size = UDim2.new(0,16,1,0); arrow.Position = UDim2.new(1,-18,0,0)
         arrow.Text = "V"; arrow.Font = Enum.Font.GothamBold
@@ -778,9 +745,8 @@ function Library:CreateWindow()
         arrow.BackgroundTransparency = 1
         arrow.AnchorPoint = Vector2.new(0,0)
 
-        -- ── List (parent = screenGui, ZIndex cao, nằm TRONG screenGui chính) ──
         local listFrame = Instance.new("Frame", screenGui)
-        listFrame.BackgroundColor3 = Color3.fromRGB(255,243,247)   -- hồng nhạt, không đen
+        listFrame.BackgroundColor3 = Color3.fromRGB(255,243,247)
         listFrame.BackgroundTransparency = 0.0
         listFrame.Visible = false
         listFrame.ZIndex = 20
@@ -809,18 +775,15 @@ function Library:CreateWindow()
             activeDropdown = CloseList
             isOpen = true
 
-            -- Lấy vị trí tuyệt đối của head SAU khi render xong
             local absPos = head.AbsolutePosition
             local absSize = head.AbsoluteSize
             local totalH = #options * ITEM_H + 6
             local listW  = absSize.X
 
-            -- Xóa items cũ
             for _, c in pairs(listFrame:GetChildren()) do
                 if c:IsA("TextButton") then c:Destroy() end
             end
 
-            -- Build items
             for i, opt in ipairs(options) do
                 local item = Instance.new("TextButton", listFrame)
                 item.Size      = UDim2.new(1,0,0,ITEM_H)
@@ -837,7 +800,11 @@ function Library:CreateWindow()
                 local pad = Instance.new("UIPadding", item)
                 pad.PaddingLeft = UDim.new(0,10)
 
-                -- checkmark + text
+                if i == 1 or i == #options then
+                    local corner = Instance.new("UICorner", item)
+                    corner.CornerRadius = UDim.new(0, 8)
+                end
+
                 local chk = Instance.new("TextLabel", item)
                 chk.Size = UDim2.new(0,12,1,0); chk.Position = UDim2.new(0,0,0,0)
                 chk.Text = opt == selected and "✓" or ""
@@ -876,32 +843,18 @@ function Library:CreateWindow()
                     if onCallback then onCallback(selected) end
                     ShowToast("Đã chọn: "..selected, "✅")
                 end)
-
-                -- Stagger fade-in từng item
-                item.BackgroundTransparency = 1
-                local targetTrans = opt == selected and 0.0 or 1
-                task.delay(0.04 * i, function()
-                    if item and item.Parent then
-                        item.Position = UDim2.new(0.05, 0, 0, (i-1)*ITEM_H+3)
-                        TweenService:Create(item, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                            {BackgroundTransparency=targetTrans, Position=UDim2.new(0,0,0,(i-1)*ITEM_H+3)}):Play()
-                    end
-                end)
             end
 
-            -- Đặt vị trí: ngay dưới head + 4px, không che head
             listFrame.Size = UDim2.new(0, listW, 0, 0)
             listFrame.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 4)
             listFrame.Visible = true
 
-            -- Animate
             TweenService:Create(arrow, TweenInfo.new(0.22,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Rotation=180}):Play()
             TweenService:Create(headStroke, TweenInfo.new(0.15), {Transparency=0.3}):Play()
             TweenService:Create(listFrame, TweenInfo.new(0.25,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
                 {Size=UDim2.new(0, listW, 0, totalH)}):Play()
         end
 
-        -- Toggle button
         local headBtn = Instance.new("TextButton", head)
         headBtn.Size = UDim2.new(1,0,1,0); headBtn.BackgroundTransparency = 1; headBtn.Text = ""; headBtn.ZIndex = 10
         headBtn.MouseButton1Click:Connect(function()
@@ -919,9 +872,9 @@ function Library:CreateWindow()
     end
 
     -- ══════════════════════════════════
-    --   CREATE TAB
+    --   CREATE TAB  ← ĐÃ SỬA: dùng ImageButton thay TextButton
     -- ══════════════════════════════════
-    function Library:CreateTab(name, iconText)
+    function Library:CreateTab(name, iconId)
         local page = Instance.new("ScrollingFrame", pages)
         page.Name=name.."Page"; page.Size=UDim2.new(1,0,1,0)
         page.BackgroundTransparency=1; page.Visible=false
@@ -933,57 +886,90 @@ function Library:CreateWindow()
         page.ClipsDescendants=true
         AttachScrollLock(page)
 
-        local tabBtn = Instance.new("TextButton", sidebar)
-        tabBtn.Size=UDim2.new(0,27,0,27); tabBtn.BackgroundColor3=DarkPink
-        tabBtn.BackgroundTransparency=0.2; tabBtn.Text=iconText or name:sub(1,1)
-        tabBtn.TextScaled=true; tabBtn.Font=Enum.Font.GothamBold; tabBtn.TextColor3=Color3.new(1,1,1)
-        Instance.new("UICorner", tabBtn).CornerRadius=UDim.new(1,0)
+        -- ── Tab button: ImageButton với Roblox asset ID ──
+        local tabBtn = Instance.new("ImageButton", sidebar)
+        tabBtn.Size                  = UDim2.new(0, 28, 0, 28)
+        tabBtn.BackgroundColor3      = DarkPink
+        tabBtn.BackgroundTransparency = 0.3
+        tabBtn.Image                 = "rbxassetid://" .. tostring(iconId or "")
+        tabBtn.ScaleType             = Enum.ScaleType.Fit
+        tabBtn.ImageColor3           = Color3.new(1, 1, 1)  -- tint trắng, hòa với nền hồng
+        Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 8)
+
+        -- Viền trắng phát sáng khi active
         local tabStroke = Instance.new("UIStroke", tabBtn)
-        tabStroke.Color = Color3.new(1, 1, 1)
-        tabStroke.Thickness = 2
-        tabStroke.Transparency = 1
+        tabStroke.Color           = Color3.new(1, 1, 1)
+        tabStroke.Thickness       = 2
+        tabStroke.Transparency    = 1
         tabStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
+        -- Glow overlay khi active (frame hồng nhạt trong suốt bên dưới ảnh)
+        local glowOverlay = Instance.new("Frame", tabBtn)
+        glowOverlay.Size                  = UDim2.new(1, 0, 1, 0)
+        glowOverlay.BackgroundColor3      = Color3.fromRGB(255, 220, 230)
+        glowOverlay.BackgroundTransparency = 1
+        glowOverlay.ZIndex                = 0
+        Instance.new("UICorner", glowOverlay).CornerRadius = UDim.new(0, 8)
+
         tabBtn.MouseButton1Click:Connect(function()
-            -- Nếu tab này đang active rồi thì không làm gì
             if page.Visible then return end
             PlayClickSound()
-            -- Đóng dropdown nếu đang mở
             if activeDropdown then activeDropdown(true) end
-            -- Ẩn tất cả page cũ với slide-out
+
+            -- Ẩn các page cũ
             for _,v in pairs(pages:GetChildren()) do
                 if v:IsA("ScrollingFrame") and v.Visible then
-                    local tw = TweenService:Create(v, TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.In),
-                        {Position=UDim2.new(-0.15,0,0,0)})
-                    tw:Play()
+                    TweenService:Create(v, TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.In),
+                        {Position=UDim2.new(-0.15,0,0,0)}):Play()
                     task.delay(0.18, function() v.Visible=false; v.Position=UDim2.new(0,0,0,0) end)
                 end
             end
-            -- Reset sidebar buttons
+
+            -- Reset tất cả tab buttons
             for _,b in pairs(sidebar:GetChildren()) do
-                if b:IsA("TextButton") then
-                    TweenService:Create(b, TweenInfo.new(0.15), {BackgroundTransparency=0.2}):Play()
+                if b:IsA("ImageButton") then
+                    TweenService:Create(b, TweenInfo.new(0.15), {BackgroundTransparency=0.3}):Play()
                     local s = b:FindFirstChildOfClass("UIStroke")
                     if s then TweenService:Create(s, TweenInfo.new(0.15), {Transparency=1}):Play() end
+                    local g = b:FindFirstChild("GlowOverlay") or b:FindFirstChildOfClass("Frame")
+                    if g then TweenService:Create(g, TweenInfo.new(0.15), {BackgroundTransparency=1}):Play() end
                 end
             end
-            -- Slide-in page mới từ bên phải
+
+            -- Slide-in page mới
             task.delay(0.12, function()
                 page.Position = UDim2.new(0.15,0,0,0)
                 page.Visible = true
                 TweenService:Create(page, TweenInfo.new(0.25,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
                     {Position=UDim2.new(0,0,0,0)}):Play()
             end)
-            -- Tab button active
-            TweenService:Create(tabBtn,    TweenInfo.new(0.15), {BackgroundTransparency=0}):Play()
-            TweenService:Create(tabStroke, TweenInfo.new(0.2),  {Transparency=0}):Play()
-            -- Tab icon bounce
+
+            -- Active state: nền đậm hơn + viền trắng + glow
+            TweenService:Create(tabBtn,     TweenInfo.new(0.15), {BackgroundTransparency=0}):Play()
+            TweenService:Create(tabStroke,  TweenInfo.new(0.2),  {Transparency=0}):Play()
+            TweenService:Create(glowOverlay, TweenInfo.new(0.2), {BackgroundTransparency=0.7}):Play()
+
+            -- Bounce animation
             TweenService:Create(tabBtn, TweenInfo.new(0.08,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),
                 {Size=UDim2.new(0,23,0,23)}):Play()
             task.delay(0.08, function()
-                TweenService:Create(tabBtn, TweenInfo.new(0.2,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
-                    {Size=UDim2.new(0,27,0,27)}):Play()
+                TweenService:Create(tabBtn, TweenInfo.new(0.22,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
+                    {Size=UDim2.new(0,28,0,28)}):Play()
             end)
+        end)
+
+        -- Hover effect
+        tabBtn.MouseEnter:Connect(function()
+            if not page.Visible then
+                TweenService:Create(tabBtn, TweenInfo.new(0.15,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
+                    {Size=UDim2.new(0,30,0,30), BackgroundTransparency=0.1}):Play()
+            end
+        end)
+        tabBtn.MouseLeave:Connect(function()
+            if not page.Visible then
+                TweenService:Create(tabBtn, TweenInfo.new(0.15,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),
+                    {Size=UDim2.new(0,28,0,28), BackgroundTransparency=0.3}):Play()
+            end
         end)
 
         local yOffset = 4
@@ -993,24 +979,6 @@ function Library:CreateWindow()
             local ROW_H  = 108
             local GAP    = 6
             local DASH_H = ROW_H * 2 + GAP
-
-            local function CreateBox(size, pos, labelText, labelSide)
-                local box = Instance.new("Frame", page)
-                box.Size=size; box.Position=pos
-                box.BackgroundColor3=Color3.fromRGB(255,255,255); box.BackgroundTransparency=0.55
-                Instance.new("UICorner", box).CornerRadius=UDim.new(0,10)
-                if labelText then
-                    local bar = Instance.new("Frame", box)
-                    bar.Size=UDim2.new(0,18,1,0)
-                    bar.BackgroundColor3=DarkPink; bar.BackgroundTransparency=0.2
-                    bar.Position = (labelSide=="left") and UDim2.new(0,0,0,0) or UDim2.new(1,-18,0,0)
-                    Instance.new("UICorner", bar).CornerRadius=UDim.new(0,10)
-                    local lbl=Instance.new("TextLabel",bar); lbl.Size=UDim2.new(1,0,1,0)
-                    lbl.Text=labelText; lbl.Font=Enum.Font.GothamBold; lbl.TextColor3=Color3.new(1,1,1)
-                    lbl.TextSize=7; lbl.TextWrapped=true; lbl.BackgroundTransparency=1
-                end
-                return box
-            end
 
             local row1Y = yOffset
 
@@ -1289,27 +1257,25 @@ function Library:CreateWindow()
 
         function elements:AddSection(text)
             local lbl = Instance.new("TextLabel", page)
-            lbl.Size=UDim2.new(1,-4,0,18); lbl.Position=UDim2.new(0.04,0,0,yOffset)
+            lbl.Size=UDim2.new(1,-4,0,18); lbl.Position=UDim2.new(0,2,0,yOffset)
             lbl.Text="── "..text.." ──"; lbl.Font=Enum.Font.GothamBold
             lbl.TextColor3=DarkPink; lbl.TextSize=9; lbl.BackgroundTransparency=1
-            lbl.TextTransparency=1
-            TweenService:Create(lbl, TweenInfo.new(0.35,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),
-                {TextTransparency=0, Position=UDim2.new(0,2,0,yOffset)}):Play()
             yOffset = yOffset + 22
         end
 
+        -- Set tab đầu tiên active
         if name == "Home" then
             page.Visible = true
-            TweenService:Create(tabBtn,    TweenInfo.new(0.1), {BackgroundTransparency=0}):Play()
-            TweenService:Create(tabStroke, TweenInfo.new(0.2), {Transparency=0}):Play()
+            TweenService:Create(tabBtn,     TweenInfo.new(0.1), {BackgroundTransparency=0}):Play()
+            TweenService:Create(tabStroke,  TweenInfo.new(0.2), {Transparency=0}):Play()
+            TweenService:Create(glowOverlay, TweenInfo.new(0.2), {BackgroundTransparency=0.7}):Play()
         end
         return elements
     end
 
-    -- ── Tự động mở UI lần đầu với animation + overlay đúng cách ──
+    -- Auto open animation
     task.defer(function()
-        task.wait(0.05)  -- đợi 1 frame để mọi element render xong
-        -- Gọi thẳng logic open (không qua isTweening check)
+        task.wait(0.05)
         openBtn.Visible = false
         overlay.Visible = true
         overlay.BackgroundTransparency = 1
@@ -1330,17 +1296,17 @@ end
 -- ═══════════════════════════════════════════
 local win = Library:CreateWindow()
 
--- HOME TAB
-local homeTab = win:CreateTab("Home", "H")
+-- HOME TAB — icon ID: 11702759796
+local homeTab = win:CreateTab("Home", "11702759796")
 homeTab:AddDashboard()
 homeTab:AddCreation()
 
--- MAIN TAB  (demo thử nghiệm các element)
-local mainTab = win:CreateTab("Main", "M")
+-- MAIN TAB  (thay "PUT_YOUR_ID_HERE" bằng ID bạn muốn)
+local mainTab = win:CreateTab("Main", "PUT_YOUR_ID_HERE")
 
 mainTab:AddSection("🔘 Toggle Test")
 mainTab:AddToggle("Toggle A", "testToggleA", function(val)
-    print("[Toggle A]", val)
+    print("[Toggle A]", val qua
 end)
 mainTab:AddToggle("Toggle B", "testToggleB", function(val)
     print("[Toggle B]", val)
@@ -1367,8 +1333,8 @@ mainTab:AddButton("▶ Chạy Test", function()
     print("[Button] Đã nhấn!")
 end, "Test thành công!", "✅")
 
--- USELESS TAB
-local uselessTab = win:CreateTab("Useless", "🤪")
+-- USELESS TAB  (thay "PUT_YOUR_ID_HERE" bằng ID bạn muốn)
+local uselessTab = win:CreateTab("Useless", "PUT_YOUR_ID_HERE")
 
 uselessTab:AddSection("Random Scripts")
 uselessTab:AddButton("👤 wklbox", function()
