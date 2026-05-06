@@ -194,7 +194,7 @@ function Library:CreateWindow()
         keybind = "rbxassetid://7072718840",   -- keyboard / keybind
 
         -- Sidebar tabs (thêm bao nhiêu tuỳ ý)
-        home    = "rbxassetid://7743875703",   -- icon nhà
+        home    = "rbxassetid://11347112419",   -- icon nhà
         main    = "rbxassetid://7743875524",   -- icon settings/gear
         useless = "rbxassetid://7743875630",   -- icon ngẫu nhiên / joystick
     }
