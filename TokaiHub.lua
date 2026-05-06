@@ -1090,7 +1090,7 @@ local win = Library:CreateWindow()
 ]]
 
 -- HOME TAB  (ID icon nhà — đổi thành ID thật)
-local homeTab = win:CreateTab("Home", "7743875703")
+local homeTab = win:CreateTab("Home", "11347112419")
 homeTab:AddDashboard()
 homeTab:AddCreation()
 
