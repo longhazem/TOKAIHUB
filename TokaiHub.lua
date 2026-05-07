@@ -904,7 +904,7 @@ end
 -- ═══════════════════════════════════════════
 local win = Library:CreateWindow()
 
-local homeTab = win:CreateTab("Home", "11347112419")
+local homeTab = win:CreateTab("Home", "86865389956898")
 homeTab:AddDashboard()
 homeTab:AddCreation()
 
