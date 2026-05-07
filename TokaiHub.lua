@@ -206,8 +206,8 @@ function Library:CreateWindow()
     -- ════════════════════════════════════════════
     local ICONS = {
         close   = ResolveImage("7072725342"),
-        lock    = ResolveImage("7072719587"),
-        unlock  = ResolveImage("7072719671"),
+        lock    = ResolveImage("77585429015889"),
+        unlock  = ResolveImage("122613499308444"),
         keybind = ResolveImage("7072718840"),
     }
 
