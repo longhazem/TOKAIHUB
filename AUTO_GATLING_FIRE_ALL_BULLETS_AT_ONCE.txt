@@ -1,11 +1,16 @@
 local networkDir = game:GetService("ReplicatedStorage"):WaitForChild("Network"):WaitForChild("GatlingGun")
 local fireRemote = networkDir:WaitForChild("RE:Fire")
 local aimRemote = networkDir:WaitForChild("URE:ReplicateAimPosition")
+local hitRemote = networkDir:WaitForChild("RE:BulletHit")
 local gganim = require(game:GetService("ReplicatedStorage").Content.Tower["Gatling Gun"].Animator)
 
 getgenv().gatlingcooldown = 0.01
 getgenv().multiplytimes = 60
 getgenv().norecoil = true
+
+if hitRemote then
+    hitRemote.OnClientEvent:Connect(function() end)
+end
 
 local lastCapturedSync = 0
 local hookTarget = fireRemote.FireServer or fireRemote.fireServer
@@ -41,7 +46,13 @@ gganim._fireGun = function(arg1)
     end
     
     local camposition = camcontroller.result and camcontroller.result.Position or camcontroller.position
-    local currentSync = lastCapturedSync ~= 0 and lastCapturedSync or (workspace:GetAttribute("Sync") or 0)
+    
+    local autoSync = 0
+    if arg1.Replicator and arg1.Replicator.Get then
+        autoSync = arg1.Replicator:Get("Sync") or arg1.Replicator:Get("SyncId") or 0
+    end
+    
+    local currentSync = lastCapturedSync ~= 0 and lastCapturedSync or (autoSync ~= 0 and autoSync or (workspace:GetAttribute("Sync") or 0))
     
     if aimRemote.FireServer then
         aimRemote:FireServer(camposition)
