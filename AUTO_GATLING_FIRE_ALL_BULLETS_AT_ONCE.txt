@@ -7,6 +7,25 @@ getgenv().gatlingcooldown = 0.01
 getgenv().multiplytimes = 60
 getgenv().norecoil = true
 
+local lastCapturedSync = 0
+local hookTarget = fireRemote.FireServer or fireRemote.fireServer
+
+if hookTarget and (hookfunction or replaceclosure) then
+    local oldHook
+    local hookFunc = function(self, ...)
+        local args = {...}
+        if args[2] then
+            lastCapturedSync = args[2]
+        end
+        return oldHook(self, ...)
+    end
+    if hookfunction then
+        oldHook = hookfunction(hookTarget, hookFunc)
+    elseif replaceclosure then
+        oldHook = replaceclosure(hookTarget, hookFunc)
+    end
+end
+
 gganim._fireGun = function(arg1)
     local stores = require(game:GetService("ReplicatedStorage").Client.Interfaces.Stores)
     local camcontroller = require(game:GetService("ReplicatedStorage").Content.Tower["Gatling Gun"].Animator.CameraController)
@@ -22,12 +41,20 @@ gganim._fireGun = function(arg1)
     end
     
     local camposition = camcontroller.result and camcontroller.result.Position or camcontroller.position
-    local currentSync = workspace:GetAttribute("Sync") or 0
+    local currentSync = lastCapturedSync ~= 0 and lastCapturedSync or (workspace:GetAttribute("Sync") or 0)
     
-    aimRemote:FireServer(camposition)
+    if aimRemote.FireServer then
+        aimRemote:FireServer(camposition)
+    else
+        aimRemote:fireServer(camposition)
+    end
     
     for i = 1, getgenv().multiplytimes do
-        fireRemote:FireServer(camposition, currentSync, workspace:GetServerTimeNow())
+        if fireRemote.FireServer then
+            fireRemote:FireServer(camposition, currentSync, workspace:GetServerTimeNow())
+        else
+            fireRemote:fireServer(camposition, currentSync, workspace:GetServerTimeNow())
+        end
     end
     
     arg1:Wait(getgenv().gatlingcooldown)
