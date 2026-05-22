@@ -1,72 +1,72 @@
 local networkDir = game:GetService("ReplicatedStorage"):WaitForChild("Network"):WaitForChild("GatlingGun")
 local fireRemote = networkDir:WaitForChild("RE:Fire")
 local aimRemote = networkDir:WaitForChild("URE:ReplicateAimPosition")
-local hitRemote = networkDir:WaitForChild("RE:BulletHit")
-local gganim = require(game:GetService("ReplicatedStorage").Content.Tower["Gatling Gun"].Animator)
 
 getgenv().gatlingcooldown = 0.01
 getgenv().multiplytimes = 60
 getgenv().norecoil = true
 
-if hitRemote then
-    hitRemote.OnClientEvent:Connect(function() end)
-end
-
-local lastCapturedSync = 0
-local hookTarget = fireRemote.FireServer or fireRemote.fireServer
-
-if hookTarget and (hookfunction or replaceclosure) then
-    local oldHook
-    local hookFunc = function(self, ...)
-        local args = {...}
-        if args[2] then
-            lastCapturedSync = args[2]
-        end
-        return oldHook(self, ...)
-    end
-    if hookfunction then
-        oldHook = hookfunction(hookTarget, hookFunc)
-    elseif replaceclosure then
-        oldHook = replaceclosure(hookTarget, hookFunc)
-    end
-end
-
-gganim._fireGun = function(arg1)
-    local stores = require(game:GetService("ReplicatedStorage").Client.Interfaces.Stores)
-    local camcontroller = require(game:GetService("ReplicatedStorage").Content.Tower["Gatling Gun"].Animator.CameraController)
-    
-    arg1:_fire(camcontroller.position)
-    
-    if not getgenv().norecoil then
-        stores.CrosshairStore.store:dispatch({
-            ["type"] = "addSpread",
-            ["spread"] = arg1.Stats.Attributes.SpreadAdd or 10
-        })
-        camcontroller.recoil(arg1.Stats.Attributes.Recoil or 0.03)
-    end
-    
-    local camposition = camcontroller.result and camcontroller.result.Position or camcontroller.position
-    
-    local autoSync = 0
-    if arg1.Replicator and arg1.Replicator.Get then
-        autoSync = arg1.Replicator:Get("Sync") or arg1.Replicator:Get("SyncId") or 0
-    end
-    
-    local currentSync = lastCapturedSync ~= 0 and lastCapturedSync or (autoSync ~= 0 and autoSync or (workspace:GetAttribute("Sync") or 0))
-    
-    if aimRemote.FireServer then
-        aimRemote:FireServer(camposition)
-    else
-        aimRemote:fireServer(camposition)
-    end
-    
-    for i = 1, getgenv().multiplytimes do
-        if fireRemote.FireServer then
-            fireRemote:FireServer(camposition, currentSync, workspace:GetServerTimeNow())
-        else
-            fireRemote:fireServer(camposition, currentSync, workspace:GetServerTimeNow())
+local function patchGatling(gganim)
+    if gganim and gganim._fireGun then
+        gganim._fireGun = function(arg1)
+            local stores = require(game:GetService("ReplicatedStorage").Client.Interfaces.Stores)
+            local camcontroller = require(game:GetService("ReplicatedStorage").Content.Tower["Gatling Gun"].Animator.CameraController)
+            
+            arg1:_fire(camcontroller.position)
+            
+            if not getgenv().norecoil then
+                stores.CrosshairStore.store:dispatch({
+                    ["type"] = "addSpread",
+                    ["spread"] = arg1.Stats.Attributes.SpreadAdd or 10
+                })
+                camcontroller.recoil(arg1.Stats.Attributes.Recoil or 0.03)
+            end
+            
+            local camposition = camcontroller.result and camcontroller.result.Position or camcontroller.position
+            
+            local currentSync = 0
+            if arg1.Replicator and arg1.Replicator.Get then
+                currentSync = arg1.Replicator:Get("Sync") or arg1.Replicator:Get("SyncId") or 0
+            elseif arg1.Stats and arg1.Stats.Sync then
+                currentSync = arg1.Stats.Sync
+            end
+            
+            if currentSync == 0 then
+                currentSync = workspace:GetAttribute("Sync") or 0
+            end
+            
+            if aimRemote.FireServer then
+                aimRemote:FireServer(camposition)
+            else
+                aimRemote:fireServer(camposition)
+            end
+            
+            for i = 1, getgenv().multiplytimes do
+                if fireRemote.FireServer then
+                    fireRemote:FireServer(camposition, currentSync, workspace:GetServerTimeNow())
+                else
+                    fireRemote:fireServer(camposition, currentSync, workspace:GetServerTimeNow())
+                end
+            end
+            
+            arg1:Wait(getgenv().gatlingcooldown)
         end
     end
-    
-    arg1:Wait(getgenv().gatlingcooldown)
 end
+
+task.spawn(function()
+    while task.wait(1) do
+        local content = game:GetService("ReplicatedStorage"):FindFirstChild("Content")
+        local tower = content and content:FindFirstChild("Tower")
+        local gatling = tower and tower:FindFirstChild("Gatling Gun")
+        local animator = gatling and gatling:FindFirstChild("Animator")
+        
+        if animator then
+            local success, gganim = pcall(require, animator)
+            if success and gganim then
+                patchGatling(gganim)
+                break
+            end
+        end
+    end
+end)
